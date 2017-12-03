@@ -32,14 +32,18 @@
 #include <stdio.h>
 
 using namespace optix;
-
 struct PerRayData_pathtrace
 {
+	// ray data
     float3 result;
     float3 radiance;
     float3 attenuation;
     float3 origin;
     float3 direction;
+
+	//
+	float3 normal;
+	//
     unsigned int seed;
     int depth;
     int countEmitted;
@@ -48,8 +52,49 @@ struct PerRayData_pathtrace
 
 struct PerRayData_pathtrace_shadow
 {
+	// in or not in a shadow
     bool inShadow;
 };
+
+__device__ int reset()
+{
+
+	return 10;
+}
+
+__device__ float4 wavelet_transformtion(float2 index,)
+{
+	float4 sum = make_float4(0.0f);
+	float4 cval = output_buffer[launch_index];
+	float4 nval = normal_buffer[launch_index];
+	float4 pval = position_buffer[launch_index];
+	float c_phi = 1.f;
+	float p_phi = 1.f;
+	float n_phi = 1.f;
+	float cum_w = 0.0;
+	for (int i = -2; i < 3; i++) {
+		for (int j = -2; j < 3;j++){
+			ctmp= output_buffer[float2(launch_index.x + i, launch_index.y + j)]
+			float4 t = cval - ctmp;
+			float dist2 = dot(t, t);
+			flaot c_w = min(exp(-dist2) / c_phi), 1.0);
+
+			float4 t = nval - normal_buffer[float2(launch_index.x + i, launch_index.y+j)];
+			float dist2 = dot(t, t);
+			flaot n_w = min(exp(-dist2) / n_phi), 1.0);
+
+			float4 t = pval - position_buffer[float2(launch_index.x + i, launch_index.y + j)];
+			float dist2 = dot(t, t);
+			flaot n_w = min(exp(-dist2) / p_phi), 1.0);
+
+			float weight = c_w*n_w*p_w;
+			sum += ctmp*weight*kernel[i * 5 + j];
+			cum_w = weight*kernel[i * 5 + j];
+		}
+	}
+	float4 result = sum / cum_w;
+	return result;
+}
 
 // Scene wide variables
 rtDeclareVariable(float,         scene_epsilon, , );
@@ -77,21 +122,25 @@ rtDeclareVariable(unsigned int,  rr_begin_depth, , );
 rtDeclareVariable(unsigned int,  pathtrace_ray_type, , );
 rtDeclareVariable(unsigned int,  pathtrace_shadow_ray_type, , );
 
+rtBuffer<float4, 2>				 history_buffer;
+rtBuffer<float3, 2>				 position_buffer;
+rtBuffer<float3, 2>				 normal_buffer;
 rtBuffer<float4, 2>              output_buffer;
 rtBuffer<ParallelogramLight>     lights;
 
 
 RT_PROGRAM void pathtrace_camera()
 {
+	//
     size_t2 screen = output_buffer.size();
-
+	//rtPrintf("%d,%d\n", launch_index.x, launch_index.y);
     float2 inv_screen = 1.0f/make_float2(screen) * 2.f;
     float2 pixel = (make_float2(launch_index)) * inv_screen - 1.f;
-
+	float3 position=make_float3(0.0f);
+	float3 normal = make_float3(0.0f);
     float2 jitter_scale = inv_screen / sqrt_num_samples;
     unsigned int samples_per_pixel = sqrt_num_samples*sqrt_num_samples;
     float3 result = make_float3(0.0f);
-
     unsigned int seed = tea<16>(screen.x*launch_index.y+launch_index.x, frame_number);
     do 
     {
@@ -109,9 +158,11 @@ RT_PROGRAM void pathtrace_camera()
         PerRayData_pathtrace prd;
         prd.result = make_float3(0.f);
         prd.attenuation = make_float3(1.f);
+		prd.normal = make_float3(0.f);
         prd.countEmitted = true;
         prd.done = false;
         prd.seed = seed;
+
         prd.depth = 0;
 
         // Each iteration is a segment of the ray path.  The closest hit will
@@ -141,6 +192,10 @@ RT_PROGRAM void pathtrace_camera()
             prd.result += prd.radiance * prd.attenuation;
 
             // Update ray data for the next path segment
+			if (prd.depth == 1) {
+				position = prd.origin;
+				normal = prd.normal;
+			}
             ray_origin = prd.origin;
             ray_direction = prd.direction;
         }
@@ -156,17 +211,24 @@ RT_PROGRAM void pathtrace_camera()
 
     if (frame_number > 1)
     {
+		
         float a = 1.0f / (float)frame_number;
         float3 old_color = make_float3(output_buffer[launch_index]);
         output_buffer[launch_index] = make_float4( lerp( old_color, pixel_color, a ), 1.0f );
+		normal_buffer[launch_index] = normal;
+		position_buffer[launch_index] = position;
+		// write the filter here
     }
     else
     {
         output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
     }
+
 }
+//
 
 
+//
 //-----------------------------------------------------------------------------
 //
 //  Emissive surface closest-hit
@@ -215,7 +277,7 @@ RT_PROGRAM void diffuse()
     optix::Onb onb( ffnormal );
     onb.inverse_transform( p );
     current_prd.direction = p;
-
+	current_prd.normal = world_shading_normal;
     // NOTE: f/pdf = 1 since we are perfectly importance sampling lambertian
     // with cosine density.
     current_prd.attenuation = current_prd.attenuation * diffuse_color;

@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -92,7 +92,7 @@ int            mouse_button;
 
 //------------------------------------------------------------------------------
 //
-// Forward decls 
+// Forward decls
 //
 //------------------------------------------------------------------------------
 
@@ -215,14 +215,14 @@ void createContext()
     Buffer buffer = sutil::createOutputBuffer( context, RT_FORMAT_FLOAT4, width, height, use_pbo );
     context["output_buffer"]->set( buffer );
 
-	Buffer positionbuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT3, width, height, use_pbo);
-	context["position_buffer"]->set(positionbuffer);
+    Buffer positionbuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT3, width, height, use_pbo);
+    context["position_buffer"]->set(positionbuffer);
 
-	Buffer normalbuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT3, width, height, use_pbo);
-	context["normal_buffer"]->set(normalbuffer);
+    Buffer normalbuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT3, width, height, use_pbo);
+    context["normal_buffer"]->set(normalbuffer);
 
-	Buffer historybuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, width, height, use_pbo);
-	context["history_buffer"]->set(historybuffer);
+    Buffer historybuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, width, height, use_pbo);
+    context["history_buffer"]->set(historybuffer);
 
     // Setup programs
     const std::string cuda_file = std::string( SAMPLE_NAME ) + ".cu";
@@ -230,7 +230,7 @@ void createContext()
     context->setRayGenerationProgram( 0, context->createProgramFromPTXFile( ptx_path, "pathtrace_camera" ) );
     context->setExceptionProgram( 0, context->createProgramFromPTXFile( ptx_path, "exception" ) );
     context->setMissProgram( 0, context->createProgramFromPTXFile( ptx_path, "miss" ) );
-    
+
     context[ "sqrt_num_samples" ]->setUint( sqrt_num_samples );
     context[ "bad_color"        ]->setFloat( 1000000.0f, 0.0f, 1000000.0f ); // Super magenta to make sure it doesn't get averaged out in the progressive rendering.
     context[ "bg_color"         ]->setFloat( make_float3(0.0f) );
@@ -373,7 +373,7 @@ void loadGeometry()
     context["top_object"]->set( geometry_group );
 }
 
-  
+
 void setupCamera()
 {
     camera_eye    = make_float3( 278.0f, 273.0f, -900.0f );
@@ -388,20 +388,20 @@ void updateCamera()
 {
     const float fov  = 35.0f;
     const float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
-    
+
     float3 camera_u, camera_v, camera_w;
     sutil::calculateCameraVariables(
             camera_eye, camera_lookat, camera_up, fov, aspect_ratio,
             camera_u, camera_v, camera_w, /*fov_is_vertical*/ true );
 
-    const Matrix4x4 frame = Matrix4x4::fromBasis( 
+    const Matrix4x4 frame = Matrix4x4::fromBasis(
             normalize( camera_u ),
             normalize( camera_v ),
             normalize( -camera_w ),
             camera_lookat);
     const Matrix4x4 frame_inv = frame.inverse();
     // Apply camera rotation twice to match old SDK behavior
-    const Matrix4x4 trans     = frame*camera_rotate*camera_rotate*frame_inv; 
+    const Matrix4x4 trans     = frame*camera_rotate*camera_rotate*frame_inv;
 
     camera_eye    = make_float3( trans*make_float4( camera_eye,    1.0f ) );
     camera_lookat = make_float3( trans*make_float4( camera_lookat, 1.0f ) );
@@ -431,25 +431,25 @@ void glutInitialize( int* argc, char** argv )
     glutInit( argc, argv );
     glutInitDisplayMode( GLUT_RGB | GLUT_ALPHA | GLUT_DEPTH | GLUT_DOUBLE );
     glutInitWindowSize( width, height );
-    glutInitWindowPosition( 100, 100 );                                               
+    glutInitWindowPosition( 100, 100 );
     glutCreateWindow( SAMPLE_NAME );
-    glutHideWindow();                                                              
+    glutHideWindow();
 }
 
 
 void glutRun()
 {
-    // Initialize GL state                                                            
-    glMatrixMode(GL_PROJECTION);                                                   
-    glLoadIdentity();                                                              
-    glOrtho(0, 1, 0, 1, -1, 1 );                                                   
+    // Initialize GL state
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, 1, 0, 1, -1, 1 );
 
-    glMatrixMode(GL_MODELVIEW);                                                    
-    glLoadIdentity();                                                              
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
 
-    glViewport(0, 0, width, height);                                 
+    glViewport(0, 0, width, height);
 
-    glutShowWindow();                                                              
+    glutShowWindow();
     glutReshapeWindow( width, height);
 
     // register glut callbacks
@@ -563,10 +563,10 @@ void glutResize( int w, int h )
 
     width  = w;
     height = h;
-    
+
     sutil::resizeBuffer( getOutputBuffer(), width, height );
 
-    glViewport(0, 0, width, height);                                               
+    glViewport(0, 0, width, height);
 
     glutPostRedisplay();
 }
@@ -588,7 +588,7 @@ void printUsageAndExit( const std::string& argv0 )
         "  -n | --nopbo              Disable GL interop for display buffer.\n"
         "  -m | --mesh <mesh_file>   Specify path to mesh to be loaded.\n"
         "App Keystrokes:\n"
-        "  q  Quit\n" 
+        "  q  Quit\n"
         "  s  Save image to '" << SAMPLE_NAME << ".ppm'\n"
         << std::endl;
 
@@ -667,4 +667,3 @@ int main( int argc, char** argv )
     }
     SUTIL_CATCH( context->get() )
 }
-

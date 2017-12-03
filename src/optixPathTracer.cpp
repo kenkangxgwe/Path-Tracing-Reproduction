@@ -50,22 +50,20 @@
 #include "optixPathTracer.h"
 #include <sutil.h>
 #include <Arcball.h>
-
+#include "Camera.h"
 #include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <stdint.h>
 
 using namespace optix;
-
-const char* const SAMPLE_NAME = "optixPathTracer";
+const char* const PROGRAM_NAME = "optixPathTracer";
 
 //------------------------------------------------------------------------------
 //
 // Globals
 //
 //------------------------------------------------------------------------------
-
 Context        context = 0;
 uint32_t       width  = 512;
 uint32_t       height = 512;
@@ -78,12 +76,12 @@ Program        pgram_intersection = 0;
 Program        pgram_bounding_box = 0;
 
 // Camera state
-float3         camera_up;
-float3         camera_lookat;
-float3         camera_eye;
-Matrix4x4      camera_rotate;
+Matrix4x4      lastFrameInvTransMat;
 bool           camera_changed = true;
 sutil::Arcball arcball;
+const float fov = 35.0f;
+Camera *myCam = new Camera(fov, width, height);
+// field of view
 
 // Mouse state
 int2           mouse_prev_pos;
@@ -102,7 +100,6 @@ void destroyContext();
 void registerExitHandler();
 void createContext();
 void loadGeometry();
-void setupCamera();
 void updateCamera();
 void glutInitialize( int* argc, char** argv );
 void glutRun();
@@ -120,11 +117,24 @@ void glutResize( int w, int h );
 //
 //------------------------------------------------------------------------------
 
+void updateCamera()
+{
+	myCam->updateCamera(width, height);
+	if (camera_changed)
+		frame_number = 1;
+	camera_changed = false;
+	context["frame_number"]->setUint(frame_number++);
+    context[ "eye"]->setFloat( myCam->getEye());
+    context[ "U"  ]->setFloat( myCam->getU());
+    context[ "V"  ]->setFloat( myCam->getV());
+    context[ "W"  ]->setFloat( myCam->getW());
+}
+
 std::string ptxPath( const std::string& cuda_file )
 {
     return
         std::string(sutil::samplesPTXDir()) +
-        "/" + std::string(SAMPLE_NAME) + "_generated_" +
+        "/" + std::string(PROGRAM_NAME) + "_generated_" +
         cuda_file +
         ".ptx";
 }
@@ -200,6 +210,7 @@ void createContext()
 {
     context = Context::create();
     context->setRayTypeCount( 2 );
+
     context->setEntryPointCount( 1 );
     context->setStackSize( 1800 );
 
@@ -225,7 +236,7 @@ void createContext()
     context["history_buffer"]->set(historybuffer);
 
     // Setup programs
-    const std::string cuda_file = std::string( SAMPLE_NAME ) + ".cu";
+    const std::string cuda_file = std::string( PROGRAM_NAME ) + ".cu";
     const std::string ptx_path = ptxPath( cuda_file );
     context->setRayGenerationProgram( 0, context->createProgramFromPTXFile( ptx_path, "pathtrace_camera" ) );
     context->setExceptionProgram( 0, context->createProgramFromPTXFile( ptx_path, "exception" ) );
@@ -239,6 +250,7 @@ void createContext()
 
 void loadGeometry()
 {
+	//TODO: make it a class and be able to load a different scene.
     // Light buffer
     ParallelogramLight light;
     light.corner   = make_float3( 343.0f, 548.6f, 227.0f);
@@ -257,7 +269,7 @@ void loadGeometry()
 
 
     // Set up material
-    const std::string cuda_file = std::string( SAMPLE_NAME ) + ".cu";
+    const std::string cuda_file = std::string( PROGRAM_NAME ) + ".cu";
     std::string ptx_path = ptxPath( cuda_file );
     Material diffuse = context->createMaterial();
     Program diffuse_ch = context->createProgramFromPTXFile( ptx_path, "diffuse" );
@@ -373,57 +385,58 @@ void loadGeometry()
     context["top_object"]->set( geometry_group );
 }
 
-
-void setupCamera()
-{
-    camera_eye    = make_float3( 278.0f, 273.0f, -900.0f );
-    camera_lookat = make_float3( 278.0f, 273.0f,    0.0f );
-    camera_up     = make_float3(   0.0f,   1.0f,    0.0f );
-
-    camera_rotate  = Matrix4x4::identity();
-}
-
-
-void updateCamera()
-{
-    const float fov  = 35.0f;
-    const float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
-
-    float3 camera_u, camera_v, camera_w;
-    sutil::calculateCameraVariables(
-            camera_eye, camera_lookat, camera_up, fov, aspect_ratio,
-            camera_u, camera_v, camera_w, /*fov_is_vertical*/ true );
-
-    const Matrix4x4 frame = Matrix4x4::fromBasis(
-            normalize( camera_u ),
-            normalize( camera_v ),
-            normalize( -camera_w ),
-            camera_lookat);
-    const Matrix4x4 frame_inv = frame.inverse();
-    // Apply camera rotation twice to match old SDK behavior
-    const Matrix4x4 trans     = frame*camera_rotate*camera_rotate*frame_inv;
-
-    camera_eye    = make_float3( trans*make_float4( camera_eye,    1.0f ) );
-    camera_lookat = make_float3( trans*make_float4( camera_lookat, 1.0f ) );
-    camera_up     = make_float3( trans*make_float4( camera_up,     0.0f ) );
-
-    sutil::calculateCameraVariables(
-            camera_eye, camera_lookat, camera_up, fov, aspect_ratio,
-            camera_u, camera_v, camera_w, true );
-
-    camera_rotate = Matrix4x4::identity();
-
-    if( camera_changed ) // reset accumulation
-        frame_number = 1;
-    camera_changed = false;
-
-    context[ "frame_number" ]->setUint( frame_number++ );
-    context[ "eye"]->setFloat( camera_eye );
-    context[ "U"  ]->setFloat( camera_u );
-    context[ "V"  ]->setFloat( camera_v );
-    context[ "W"  ]->setFloat( camera_w );
-
-}
+  
+//void setupCamera()
+//{
+//    camera_eye    = make_float3( 278.0f, 273.0f, -900.0f );
+//    camera_lookat = make_float3( 278.0f, 273.0f,    0.0f );
+//    camera_up     = make_float3(   0.0f,   1.0f,    0.0f );
+//
+//    camera_rotate  = Matrix4x4::identity();
+//}
+//
+//
+//void updateCamera()
+//{
+//	// field of view
+//    const float fov  = 35.0f;
+//    const float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
+//    
+//    float3 camera_u, camera_v, camera_w;
+//    sutil::calculateCameraVariables(
+//            camera_eye, camera_lookat, camera_up, fov, aspect_ratio,
+//            camera_u, camera_v, camera_w, /*fov_is_vertical*/ true );
+//
+//    const Matrix4x4 frame = Matrix4x4::fromBasis( 
+//            normalize( camera_u ),
+//            normalize( camera_v ),
+//            normalize( -camera_w ),
+//            camera_lookat);
+//    const Matrix4x4 frame_inv = frame.inverse();
+//    // Apply camera rotation twice to match old SDK behavior
+//    const Matrix4x4 trans     = frame*camera_rotate*camera_rotate*frame_inv; 
+//
+//    camera_eye    = make_float3( trans*make_float4( camera_eye,    1.0f ) );
+//    camera_lookat = make_float3( trans*make_float4( camera_lookat, 1.0f ) );
+//    camera_up     = make_float3( trans*make_float4( camera_up,     0.0f ) );
+//
+//    sutil::calculateCameraVariables(
+//            camera_eye, camera_lookat, camera_up, fov, aspect_ratio,
+//            camera_u, camera_v, camera_w, true );
+//
+//    camera_rotate = Matrix4x4::identity();
+//
+//    if( camera_changed ) // reset accumulation
+//        frame_number = 1;
+//    camera_changed = false;
+//
+//    context[ "frame_number" ]->setUint( frame_number++ );
+//    context[ "eye"]->setFloat( camera_eye );
+//    context[ "U"  ]->setFloat( camera_u );
+//    context[ "V"  ]->setFloat( camera_v );
+//    context[ "W"  ]->setFloat( camera_w );
+//
+//}
 
 
 void glutInitialize( int* argc, char** argv )
@@ -431,9 +444,9 @@ void glutInitialize( int* argc, char** argv )
     glutInit( argc, argv );
     glutInitDisplayMode( GLUT_RGB | GLUT_ALPHA | GLUT_DEPTH | GLUT_DOUBLE );
     glutInitWindowSize( width, height );
-    glutInitWindowPosition( 100, 100 );
-    glutCreateWindow( SAMPLE_NAME );
-    glutHideWindow();
+    glutInitWindowPosition( 100, 100 );                                               
+    glutCreateWindow( PROGRAM_NAME );
+    glutHideWindow();                                                              
 }
 
 
@@ -475,6 +488,7 @@ void glutRun()
 void glutDisplay()
 {
     updateCamera();
+
     context->launch( 0, width, height );
 
     sutil::displayBufferGL( getOutputBuffer() );
@@ -490,6 +504,7 @@ void glutDisplay()
 
 void glutKeyboardPress( unsigned char k, int x, int y )
 {
+	//TODO: keyboards on camera.
 
     switch( k )
     {
@@ -501,7 +516,7 @@ void glutKeyboardPress( unsigned char k, int x, int y )
         }
         case( 's' ):
         {
-            const std::string outputImage = std::string(SAMPLE_NAME) + ".ppm";
+            const std::string outputImage = std::string(PROGRAM_NAME) + ".ppm";
             std::cerr << "Saving current frame to '" << outputImage << "'\n";
             sutil::displayBufferPPM( outputImage.c_str(), getOutputBuffer() );
             break;
@@ -534,8 +549,9 @@ void glutMouseMotion( int x, int y)
                          static_cast<float>( height );
         const float dmax = fabsf( dx ) > fabs( dy ) ? dx : dy;
         const float scale = std::min<float>( dmax, 0.9f );
-        camera_eye = camera_eye + (camera_lookat - camera_eye)*scale;
+		myCam->setEye(myCam->getEye() + (myCam->getLookAt() - myCam->getEye()) * scale);
         camera_changed = true;
+		lastFrameInvTransMat = myCam->getLastFrameInverseMat();
     }
     else if( mouse_button == GLUT_LEFT_BUTTON )
     {
@@ -547,8 +563,9 @@ void glutMouseMotion( int x, int y)
         const float2 a = { from.x / width, from.y / height };
         const float2 b = { to.x   / width, to.y   / height };
 
-        camera_rotate = arcball.rotate( b, a );
+		myCam->setRotate(arcball.rotate(b, a));
         camera_changed = true;
+		lastFrameInvTransMat = myCam->getLastFrameInverseMat();
     }
 
     mouse_prev_pos = make_int2( x, y );
@@ -560,6 +577,7 @@ void glutResize( int w, int h )
     if ( w == (int)width && h == (int)height ) return;
 
     camera_changed = true;
+	lastFrameInvTransMat = myCam->getLastFrameInverseMat();
 
     width  = w;
     height = h;
@@ -588,8 +606,8 @@ void printUsageAndExit( const std::string& argv0 )
         "  -n | --nopbo              Disable GL interop for display buffer.\n"
         "  -m | --mesh <mesh_file>   Specify path to mesh to be loaded.\n"
         "App Keystrokes:\n"
-        "  q  Quit\n"
-        "  s  Save image to '" << SAMPLE_NAME << ".ppm'\n"
+        "  q  Quit\n" 
+        "  s  Save image to '" << PROGRAM_NAME << ".ppm'\n"
         << std::endl;
 
     exit(1);
@@ -646,7 +664,7 @@ int main( int argc, char** argv )
 #endif
 
         createContext();
-        setupCamera();
+        //setupCamera();
         loadGeometry();
 
         context->validate();
@@ -658,6 +676,7 @@ int main( int argc, char** argv )
         else
         {
             updateCamera();
+
             context->launch( 0, width, height );
             sutil::displayBufferPPM( out_file.c_str(), getOutputBuffer() );
             destroyContext();

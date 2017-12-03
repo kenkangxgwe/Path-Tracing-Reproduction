@@ -191,7 +191,7 @@ RT_PROGRAM void diffuseEmitter()
 rtDeclareVariable(float3,     diffuse_color, , );
 rtDeclareVariable(float3,     geometric_normal, attribute geometric_normal, );
 rtDeclareVariable(float3,     shading_normal,   attribute shading_normal, );
-rtDeclareVariable(optix::Ray, ray,              rtCurrentRay, );
+rtDeclareVariable(optix::Ray, ray,              rtCurrentRay, ); 
 rtDeclareVariable(float,      t_hit,            rtIntersectionDistance, );
 
 

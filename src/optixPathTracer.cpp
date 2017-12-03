@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -70,7 +70,7 @@ uint32_t       height = 512;
 bool           use_pbo = true;
 
 int            frame_number = 1;
-int            sqrt_num_samples = 2;
+int            sqrt_num_samples = 1;
 int            rr_begin_depth = 1;
 Program        pgram_intersection = 0;
 Program        pgram_bounding_box = 0;
@@ -90,7 +90,7 @@ int            mouse_button;
 
 //------------------------------------------------------------------------------
 //
-// Forward decls 
+// Forward decls
 //
 //------------------------------------------------------------------------------
 
@@ -214,6 +214,10 @@ void createContext()
     context->setEntryPointCount( 1 );
     context->setStackSize( 1800 );
 
+	context->setPrintEnabled(1);
+	//
+	//rtContextSetPrintEnabled(context, 2);
+	//
     context[ "scene_epsilon"                  ]->setFloat( 1.e-3f );
     context[ "pathtrace_ray_type"             ]->setUint( 0u );
     context[ "pathtrace_shadow_ray_type"      ]->setUint( 1u );
@@ -222,13 +226,22 @@ void createContext()
     Buffer buffer = sutil::createOutputBuffer( context, RT_FORMAT_FLOAT4, width, height, use_pbo );
     context["output_buffer"]->set( buffer );
 
+    Buffer positionbuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT3, width, height, use_pbo);
+    context["position_buffer"]->set(positionbuffer);
+
+    Buffer normalbuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT3, width, height, use_pbo);
+    context["normal_buffer"]->set(normalbuffer);
+
+    Buffer historybuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, width, height, use_pbo);
+    context["history_buffer"]->set(historybuffer);
+
     // Setup programs
     const std::string cuda_file = std::string( PROGRAM_NAME ) + ".cu";
     const std::string ptx_path = ptxPath( cuda_file );
     context->setRayGenerationProgram( 0, context->createProgramFromPTXFile( ptx_path, "pathtrace_camera" ) );
     context->setExceptionProgram( 0, context->createProgramFromPTXFile( ptx_path, "exception" ) );
     context->setMissProgram( 0, context->createProgramFromPTXFile( ptx_path, "miss" ) );
-    
+
     context[ "sqrt_num_samples" ]->setUint( sqrt_num_samples );
     context[ "bad_color"        ]->setFloat( 1000000.0f, 0.0f, 1000000.0f ); // Super magenta to make sure it doesn't get averaged out in the progressive rendering.
     context[ "bg_color"         ]->setFloat( make_float3(0.0f) );
@@ -439,17 +452,17 @@ void glutInitialize( int* argc, char** argv )
 
 void glutRun()
 {
-    // Initialize GL state                                                            
-    glMatrixMode(GL_PROJECTION);                                                   
-    glLoadIdentity();                                                              
-    glOrtho(0, 1, 0, 1, -1, 1 );                                                   
+    // Initialize GL state
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, 1, 0, 1, -1, 1 );
 
-    glMatrixMode(GL_MODELVIEW);                                                    
-    glLoadIdentity();                                                              
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
 
-    glViewport(0, 0, width, height);                                 
+    glViewport(0, 0, width, height);
 
-    glutShowWindow();                                                              
+    glutShowWindow();
     glutReshapeWindow( width, height);
 
     // register glut callbacks
@@ -484,8 +497,8 @@ void glutDisplay()
       static unsigned frame_count = 0;
       sutil::displayFps( frame_count++ );
     }
-
     glutSwapBuffers();
+
 }
 
 
@@ -568,10 +581,10 @@ void glutResize( int w, int h )
 
     width  = w;
     height = h;
-    
+
     sutil::resizeBuffer( getOutputBuffer(), width, height );
 
-    glViewport(0, 0, width, height);                                               
+    glViewport(0, 0, width, height);
 
     glutPostRedisplay();
 }
@@ -673,4 +686,3 @@ int main( int argc, char** argv )
     }
     SUTIL_CATCH( context->get() )
 }
-

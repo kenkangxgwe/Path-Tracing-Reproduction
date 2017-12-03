@@ -42,11 +42,19 @@ else()
 endif()
 
 macro(OPTIX_find_api_library name version)
-  find_library(${name}_LIBRARY
-    NAMES ${name}.${version} ${name}
-    PATHS "${OptiX_INSTALL_DIR}/lib${bit_dest}"
-    NO_DEFAULT_PATH
-    )
+  if(UNIX)
+    find_library(${name}_LIBRARY
+      NAMES ${name}.${version} ${name}
+      PATHS "${OptiX_INSTALL_DIR}/lib${bit_dest}-linux"
+      NO_DEFAULT_PATH
+      )
+  else()
+    find_library(${name}_LIBRARY
+      NAMES ${name}.${version} ${name}
+      PATHS "${OptiX_INSTALL_DIR}/lib${bit_dest}"
+      NO_DEFAULT_PATH
+      )
+  endif()
   find_library(${name}_LIBRARY
     NAMES ${name}.${version} ${name}
     )

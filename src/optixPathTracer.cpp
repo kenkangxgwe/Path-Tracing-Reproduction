@@ -51,21 +51,19 @@
 #include <sutil.h>
 #include <Arcball.h>
 #include "Camera.h"
-
 #include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <stdint.h>
 
 using namespace optix;
-const char* const SAMPLE_NAME = "optixPathTracer";
+const char* const PROGRAM_NAME = "optixPathTracer";
 
 //------------------------------------------------------------------------------
 //
 // Globals
 //
 //------------------------------------------------------------------------------
-Camera dfdf;
 Context        context = 0;
 uint32_t       width  = 512;
 uint32_t       height = 512;
@@ -78,13 +76,11 @@ Program        pgram_intersection = 0;
 Program        pgram_bounding_box = 0;
 
 // Camera state
-float3		   camera_lookat;
-float3		   camera_up;
-float3         camera_lookup;
-float3         camera_eye;
-Matrix4x4      camera_rotate;
+Matrix4x4      lastFrameInvTransMat;
 bool           camera_changed = true;
 sutil::Arcball arcball;
+const float fov = 35.0f;
+Camera *myCam = new Camera(fov, width, height);
 // field of view
 
 // Mouse state
@@ -104,8 +100,7 @@ void destroyContext();
 void registerExitHandler();
 void createContext();
 void loadGeometry();
-//void setupCamera();
-//void updateCamera();
+void updateCamera();
 void glutInitialize( int* argc, char** argv );
 void glutRun();
 
@@ -122,12 +117,24 @@ void glutResize( int w, int h );
 //
 //------------------------------------------------------------------------------
 
+void updateCamera()
+{
+	myCam->updateCamera(width, height);
+	if (camera_changed)
+		frame_number = 1;
+	camera_changed = false;
+	context["frame_number"]->setUint(frame_number++);
+    context[ "eye"]->setFloat( myCam->getEye());
+    context[ "U"  ]->setFloat( myCam->getU());
+    context[ "V"  ]->setFloat( myCam->getV());
+    context[ "W"  ]->setFloat( myCam->getW());
+}
+
 std::string ptxPath( const std::string& cuda_file )
 {
-	Camera came;
     return
         std::string(sutil::samplesPTXDir()) +
-        "/" + std::string(SAMPLE_NAME) + "_generated_" +
+        "/" + std::string(PROGRAM_NAME) + "_generated_" +
         cuda_file +
         ".ptx";
 }
@@ -203,6 +210,7 @@ void createContext()
 {
     context = Context::create();
     context->setRayTypeCount( 2 );
+
     context->setEntryPointCount( 1 );
     context->setStackSize( 1800 );
 
@@ -215,7 +223,7 @@ void createContext()
     context["output_buffer"]->set( buffer );
 
     // Setup programs
-    const std::string cuda_file = std::string( SAMPLE_NAME ) + ".cu";
+    const std::string cuda_file = std::string( PROGRAM_NAME ) + ".cu";
     const std::string ptx_path = ptxPath( cuda_file );
     context->setRayGenerationProgram( 0, context->createProgramFromPTXFile( ptx_path, "pathtrace_camera" ) );
     context->setExceptionProgram( 0, context->createProgramFromPTXFile( ptx_path, "exception" ) );
@@ -248,7 +256,7 @@ void loadGeometry()
 
 
     // Set up material
-    const std::string cuda_file = std::string( SAMPLE_NAME ) + ".cu";
+    const std::string cuda_file = std::string( PROGRAM_NAME ) + ".cu";
     std::string ptx_path = ptxPath( cuda_file );
     Material diffuse = context->createMaterial();
     Program diffuse_ch = context->createProgramFromPTXFile( ptx_path, "diffuse" );
@@ -424,7 +432,7 @@ void glutInitialize( int* argc, char** argv )
     glutInitDisplayMode( GLUT_RGB | GLUT_ALPHA | GLUT_DEPTH | GLUT_DOUBLE );
     glutInitWindowSize( width, height );
     glutInitWindowPosition( 100, 100 );                                               
-    glutCreateWindow( SAMPLE_NAME );
+    glutCreateWindow( PROGRAM_NAME );
     glutHideWindow();                                                              
 }
 
@@ -467,6 +475,7 @@ void glutRun()
 void glutDisplay()
 {
     updateCamera();
+
     context->launch( 0, width, height );
 
     sutil::displayBufferGL( getOutputBuffer() );
@@ -494,7 +503,7 @@ void glutKeyboardPress( unsigned char k, int x, int y )
         }
         case( 's' ):
         {
-            const std::string outputImage = std::string(SAMPLE_NAME) + ".ppm";
+            const std::string outputImage = std::string(PROGRAM_NAME) + ".ppm";
             std::cerr << "Saving current frame to '" << outputImage << "'\n";
             sutil::displayBufferPPM( outputImage.c_str(), getOutputBuffer() );
             break;
@@ -527,8 +536,9 @@ void glutMouseMotion( int x, int y)
                          static_cast<float>( height );
         const float dmax = fabsf( dx ) > fabs( dy ) ? dx : dy;
         const float scale = std::min<float>( dmax, 0.9f );
-        camera_eye = camera_eye + (camera_lookat - camera_eye)*scale;
+		myCam->setEye(myCam->getEye() + (myCam->getLookAt() - myCam->getEye()) * scale);
         camera_changed = true;
+		lastFrameInvTransMat = myCam->getLastFrameInverseMat();
     }
     else if( mouse_button == GLUT_LEFT_BUTTON )
     {
@@ -540,8 +550,9 @@ void glutMouseMotion( int x, int y)
         const float2 a = { from.x / width, from.y / height };
         const float2 b = { to.x   / width, to.y   / height };
 
-        camera_rotate = arcball.rotate( b, a );
+		myCam->setRotate(arcball.rotate(b, a));
         camera_changed = true;
+		lastFrameInvTransMat = myCam->getLastFrameInverseMat();
     }
 
     mouse_prev_pos = make_int2( x, y );
@@ -553,6 +564,7 @@ void glutResize( int w, int h )
     if ( w == (int)width && h == (int)height ) return;
 
     camera_changed = true;
+	lastFrameInvTransMat = myCam->getLastFrameInverseMat();
 
     width  = w;
     height = h;
@@ -582,7 +594,7 @@ void printUsageAndExit( const std::string& argv0 )
         "  -m | --mesh <mesh_file>   Specify path to mesh to be loaded.\n"
         "App Keystrokes:\n"
         "  q  Quit\n" 
-        "  s  Save image to '" << SAMPLE_NAME << ".ppm'\n"
+        "  s  Save image to '" << PROGRAM_NAME << ".ppm'\n"
         << std::endl;
 
     exit(1);
@@ -651,6 +663,7 @@ int main( int argc, char** argv )
         else
         {
             updateCamera();
+
             context->launch( 0, width, height );
             sutil::displayBufferPPM( out_file.c_str(), getOutputBuffer() );
             destroyContext();

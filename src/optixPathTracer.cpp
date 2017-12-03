@@ -72,7 +72,7 @@ uint32_t       height = 512;
 bool           use_pbo = true;
 
 int            frame_number = 1;
-int            sqrt_num_samples = 2;
+int            sqrt_num_samples = 1;
 int            rr_begin_depth = 1;
 Program        pgram_intersection = 0;
 Program        pgram_bounding_box = 0;
@@ -203,6 +203,10 @@ void createContext()
     context->setEntryPointCount( 1 );
     context->setStackSize( 1800 );
 
+	context->setPrintEnabled(1);
+	//
+	//rtContextSetPrintEnabled(context, 2);
+	//
     context[ "scene_epsilon"                  ]->setFloat( 1.e-3f );
     context[ "pathtrace_ray_type"             ]->setUint( 0u );
     context[ "pathtrace_shadow_ray_type"      ]->setUint( 1u );
@@ -210,6 +214,15 @@ void createContext()
 
     Buffer buffer = sutil::createOutputBuffer( context, RT_FORMAT_FLOAT4, width, height, use_pbo );
     context["output_buffer"]->set( buffer );
+
+	Buffer positionbuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT3, width, height, use_pbo);
+	context["position_buffer"]->set(positionbuffer);
+
+	Buffer normalbuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT3, width, height, use_pbo);
+	context["normal_buffer"]->set(normalbuffer);
+
+	Buffer historybuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, width, height, use_pbo);
+	context["history_buffer"]->set(historybuffer);
 
     // Setup programs
     const std::string cuda_file = std::string( SAMPLE_NAME ) + ".cu";
@@ -470,8 +483,8 @@ void glutDisplay()
       static unsigned frame_count = 0;
       sutil::displayFps( frame_count++ );
     }
-
     glutSwapBuffers();
+
 }
 
 

@@ -1,37 +1,3 @@
-/*
- * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
-//-----------------------------------------------------------------------------
-//
-// optixPathTracer: simple interactive path tracer
-//
-//-----------------------------------------------------------------------------
-
 #ifdef __APPLE__
 #  include <GLUT/glut.h>
 #else
@@ -52,6 +18,7 @@
 #include <Arcball.h>
 #include "Camera.h"
 #include <algorithm>
+#include <OptiXMesh.h>
 #include <cstring>
 #include <iostream>
 #include <stdint.h>
@@ -100,6 +67,7 @@ void destroyContext();
 void registerExitHandler();
 void createContext();
 void loadGeometry();
+void loadGeometryFromFile(const std::string &filename);
 void updateCamera();
 void glutInitialize( int* argc, char** argv );
 void glutRun();
@@ -215,9 +183,6 @@ void createContext()
     context->setStackSize( 1800 );
 
 	context->setPrintEnabled(1);
-	//
-	//rtContextSetPrintEnabled(context, 2);
-	//
     context[ "scene_epsilon"                  ]->setFloat( 1.e-3f );
     context[ "pathtrace_ray_type"             ]->setUint( 0u );
     context[ "pathtrace_shadow_ray_type"      ]->setUint( 1u );
@@ -248,6 +213,68 @@ void createContext()
 }
 
 
+void loadGeometryFromFile(const std::string &filename)
+{
+	//TODO: make it a class and be able to load a different scene.
+    // Light buffer
+    ParallelogramLight light;
+    light.corner   = make_float3( -0.24f, 1.88f, -0.22f);
+    light.v1       = make_float3( 0.0f, 0.0f, 0.38f);
+    light.v2       = make_float3( 0.47f, 0.0f, 0.0f);
+    light.normal   = normalize( cross(light.v1, light.v2) );
+    light.emission = make_float3( 17.0f, 12.0f, 4.0f );
+ //   ParallelogramLight light;
+ //   light.corner   = make_float3( -0.24f, 5.88f, -0.22f);
+ //   light.v1       = make_float3( 0.0f, 0.0f, 0.38f);
+ //   light.v2       = make_float3( 0.47f, 0.0f, 0.0f);
+ //   light.normal   = normalize( cross(light.v1, light.v2) );
+ //   light.emission = make_float3( 57.0f, 52.0f, 20.0f );
+
+ //   ParallelogramLight sunlight;
+ //   sunlight.corner   = make_float3( 8.24f, 9.88f, -0.22f);
+ //   sunlight.v1       = make_float3( 0.0f, 0.0f, 0.38f);
+ //   sunlight.v2       = make_float3( 0.47f, 0.47f, 0.0f);
+ //   sunlight.normal   = normalize( cross(light.v1, light.v2) );
+ //   sunlight.emission = make_float3( 80.0f, 80.0f, 50.0f );
+	//ParallelogramLight lightArray[2] = { light, sunlight };
+
+    Buffer light_buffer = context->createBuffer( RT_BUFFER_INPUT );
+    light_buffer->setFormat( RT_FORMAT_USER );
+    light_buffer->setElementSize( sizeof( ParallelogramLight ) );
+    light_buffer->setSize( 1u );
+    memcpy( light_buffer->map(), &light, sizeof( light) );
+    light_buffer->unmap();
+    context["lights"]->setBuffer( light_buffer );
+
+
+    // Set up material
+    const std::string cuda_file = std::string( PROGRAM_NAME ) + ".cu";
+    std::string ptx_path = ptxPath( cuda_file );
+    Program diffuse_ch = context->createProgramFromPTXFile( ptx_path, "diffuse" );
+    Program diffuse_ah = context->createProgramFromPTXFile( ptx_path, "shadow" );
+
+    Material diffuse_light = context->createMaterial();
+    Program diffuse_em = context->createProgramFromPTXFile( ptx_path, "diffuseEmitter" );
+    diffuse_light->setClosestHitProgram( 0, diffuse_em );
+
+	OptiXMesh mesh;
+	mesh.context = context;
+	mesh.closest_hit = diffuse_ch;
+	mesh.any_hit = diffuse_ah;
+	loadMesh(filename, mesh);
+
+    GeometryGroup shadow_group = context->createGeometryGroup();
+    shadow_group->addChild( mesh.geom_instance );
+    shadow_group->setAcceleration( context->createAcceleration( "Trbvh" ) );
+	Transform transformedToWorld = context->createTransform();
+	transformedToWorld->setMatrix(false, Matrix4x4::scale(make_float3(1.0f)).getData(), NULL);
+	transformedToWorld->setChild(shadow_group);
+    context[ "top_shadower" ]->set( transformedToWorld ); 
+	transformedToWorld->validate();
+
+    context["top_object"]->set(transformedToWorld);
+}
+
 void loadGeometry()
 {
 	//TODO: make it a class and be able to load a different scene.
@@ -261,6 +288,7 @@ void loadGeometry()
 
     Buffer light_buffer = context->createBuffer( RT_BUFFER_INPUT );
     light_buffer->setFormat( RT_FORMAT_USER );
+	std::cout << sizeof(ParallelogramLight) << std::endl;
     light_buffer->setElementSize( sizeof( ParallelogramLight ) );
     light_buffer->setSize( 1u );
     memcpy( light_buffer->map(), &light, sizeof( light ) );
@@ -371,7 +399,11 @@ void loadGeometry()
     // Create shadow group (no light)
     GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
     shadow_group->setAcceleration( context->createAcceleration( "Trbvh" ) );
-    context["top_shadower"]->set( shadow_group );
+	Transform transformedShadow = context->createTransform();
+	transformedShadow->setMatrix(false, Matrix4x4::scale(make_float3(0.5f)).getData(), NULL);
+	transformedShadow->setChild(shadow_group);
+    context["top_shadower"]->set( transformedShadow );
+	transformedShadow->validate();
 
     // Light
     gis.push_back( createParallelogram( make_float3( 343.0f, 548.6f, 227.0f),
@@ -382,61 +414,12 @@ void loadGeometry()
     // Create geometry group
     GeometryGroup geometry_group = context->createGeometryGroup(gis.begin(), gis.end());
     geometry_group->setAcceleration( context->createAcceleration( "Trbvh" ) );
-    context["top_object"]->set( geometry_group );
+	Transform transformedGeometry = context->createTransform();
+	transformedGeometry->setMatrix(false, Matrix4x4::scale(make_float3(0.5f)).getData(), NULL);
+	transformedGeometry->setChild(geometry_group);
+    context["top_object"]->set( transformedGeometry );
+	transformedGeometry->validate();
 }
-
-  
-//void setupCamera()
-//{
-//    camera_eye    = make_float3( 278.0f, 273.0f, -900.0f );
-//    camera_lookat = make_float3( 278.0f, 273.0f,    0.0f );
-//    camera_up     = make_float3(   0.0f,   1.0f,    0.0f );
-//
-//    camera_rotate  = Matrix4x4::identity();
-//}
-//
-//
-//void updateCamera()
-//{
-//	// field of view
-//    const float fov  = 35.0f;
-//    const float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
-//    
-//    float3 camera_u, camera_v, camera_w;
-//    sutil::calculateCameraVariables(
-//            camera_eye, camera_lookat, camera_up, fov, aspect_ratio,
-//            camera_u, camera_v, camera_w, /*fov_is_vertical*/ true );
-//
-//    const Matrix4x4 frame = Matrix4x4::fromBasis( 
-//            normalize( camera_u ),
-//            normalize( camera_v ),
-//            normalize( -camera_w ),
-//            camera_lookat);
-//    const Matrix4x4 frame_inv = frame.inverse();
-//    // Apply camera rotation twice to match old SDK behavior
-//    const Matrix4x4 trans     = frame*camera_rotate*camera_rotate*frame_inv; 
-//
-//    camera_eye    = make_float3( trans*make_float4( camera_eye,    1.0f ) );
-//    camera_lookat = make_float3( trans*make_float4( camera_lookat, 1.0f ) );
-//    camera_up     = make_float3( trans*make_float4( camera_up,     0.0f ) );
-//
-//    sutil::calculateCameraVariables(
-//            camera_eye, camera_lookat, camera_up, fov, aspect_ratio,
-//            camera_u, camera_v, camera_w, true );
-//
-//    camera_rotate = Matrix4x4::identity();
-//
-//    if( camera_changed ) // reset accumulation
-//        frame_number = 1;
-//    camera_changed = false;
-//
-//    context[ "frame_number" ]->setUint( frame_number++ );
-//    context[ "eye"]->setFloat( camera_eye );
-//    context[ "U"  ]->setFloat( camera_u );
-//    context[ "V"  ]->setFloat( camera_v );
-//    context[ "W"  ]->setFloat( camera_w );
-//
-//}
 
 
 void glutInitialize( int* argc, char** argv )
@@ -508,19 +491,55 @@ void glutKeyboardPress( unsigned char k, int x, int y )
 
     switch( k )
     {
-        case( 'q' ):
+        case( 'x' ):
         case( 27 ): // ESC
         {
             destroyContext();
             exit(0);
         }
-        case( 's' ):
+        case( 'u' ):
         {
             const std::string outputImage = std::string(PROGRAM_NAME) + ".ppm";
             std::cerr << "Saving current frame to '" << outputImage << "'\n";
             sutil::displayBufferPPM( outputImage.c_str(), getOutputBuffer() );
             break;
         }
+		case ('w'):
+		{
+			myCam->keyIn(MOVE_DIR::FORWARD);
+			camera_changed = true;
+			break;
+		}
+		case ('s'):
+		{
+			myCam->keyIn(MOVE_DIR::BACKWARD);
+			camera_changed = true;
+			break;
+		}
+		case ('a'):
+		{
+			myCam->keyIn(MOVE_DIR::LEFT);
+			camera_changed = true;
+			break;
+		}
+		case ('d'):
+		{
+			myCam->keyIn(MOVE_DIR::RIGHT);
+			camera_changed = true;
+			break;
+		}
+		case ('q'):
+		{
+			myCam->keyIn(MOVE_DIR::UP);
+			camera_changed = true;
+			break;
+		}
+		case ('e'):
+		{
+			myCam->keyIn(MOVE_DIR::DOWN);
+			camera_changed = true;
+			break;
+		}
     }
 }
 
@@ -665,7 +684,10 @@ int main( int argc, char** argv )
 
         createContext();
         //setupCamera();
-        loadGeometry();
+		//loadGeometry();
+        loadGeometryFromFile("C:/Users/Anseren/Downloads/CornellBox/CornellBox-Original.obj");
+        //loadGeometryFromFile("C:/Users/Anseren/Documents/GitHhub_Projects/Path-Tracing-Reproduction/breakfast_room/breakfast_room.obj");
+        //loadGeometryFromFile("C:/ProgramData/NVIDIA Corporation/OptiX SDK 4.1.1/SDK/data/cow.obj");
 
         context->validate();
 

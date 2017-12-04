@@ -143,6 +143,7 @@ optix::Material createOptiXMaterial(
   mat[ "Ks"        ]->set3fv( mat_params.Ks );
   mat[ "Kr"        ]->set3fv( mat_params.Kr );
   mat[ "Ka"        ]->set3fv( mat_params.Ka );
+  mat[ "Ke"        ]->set3fv( mat_params.Ke );
   mat[ "phong_exp" ]->setFloat( mat_params.exp );
 
   return mat;

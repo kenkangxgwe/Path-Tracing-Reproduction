@@ -90,7 +90,7 @@ rtDeclareVariable(unsigned int,  pathtrace_shadow_ray_type, , );
 
 rtBuffer<float4, 2>              history_buffer;
 rtBuffer<float3, 2>              position_buffer;
-rtBuffer<float3, 2>     				 normal_buffer;
+rtBuffer<float3, 2>     		 normal_buffer;
 rtBuffer<float4, 2>              output_buffer;
 rtBuffer<ParallelogramLight>     lights;
 
@@ -142,6 +142,8 @@ RT_PROGRAM void pathtrace_camera()
             {
                 // We have hit the background or a luminaire
                 prd.result += prd.radiance * prd.attenuation;
+				//Victory!
+				//rtPrintf("result = (%f,%f,%f)\n", prd.result.x, prd.result.y, prd.result.z);
                 break;
             }
 
@@ -156,6 +158,7 @@ RT_PROGRAM void pathtrace_camera()
 
             prd.depth++;
             prd.result += prd.radiance * prd.attenuation;
+			//rtPrintf("result = (%f,%f,%f)\n", prd.result.x, prd.result.y, prd.result.z);
 
             // Update ray data for the next path segment
 			if (prd.depth == 1) {
@@ -216,7 +219,9 @@ RT_PROGRAM void diffuseEmitter()
 //
 //-----------------------------------------------------------------------------
 
-rtDeclareVariable(float3,     diffuse_color, , );
+//rtDeclareVariable(float3,     diffuse_color, , );
+rtDeclareVariable(float3,     Kd, , );
+rtDeclareVariable(float3,     Ke, , );
 rtDeclareVariable(float3,     geometric_normal, attribute geometric_normal, );
 rtDeclareVariable(float3,     shading_normal,   attribute shading_normal, );
 rtDeclareVariable(optix::Ray, ray,              rtCurrentRay, ); 
@@ -225,6 +230,12 @@ rtDeclareVariable(float,      t_hit,            rtIntersectionDistance, );
 
 RT_PROGRAM void diffuse()
 {
+	if (Ke.x != 0.f || Ke.y != 0.f || Ke.z != 0.f) {
+		current_prd.radiance = current_prd.countEmitted ? Ke : make_float3(0.f);
+		current_prd.done = true;
+		return;
+	}
+
     float3 world_shading_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
     float3 world_geometric_normal = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, geometric_normal ) );
     float3 ffnormal = faceforward( world_shading_normal, -ray.direction, world_geometric_normal );
@@ -246,7 +257,10 @@ RT_PROGRAM void diffuse()
 	current_prd.normal = world_shading_normal;
     // NOTE: f/pdf = 1 since we are perfectly importance sampling lambertian
     // with cosine density.
-    current_prd.attenuation = current_prd.attenuation * diffuse_color;
+    //current_prd.attenuation = current_prd.attenuation * diffuse_color;
+    current_prd.attenuation = current_prd.attenuation * Kd;
+	//Victory!
+	//rtPrintf("attenuation = (%f, %f, %f)\n", current_prd.attenuation.x, current_prd.attenuation.y, current_prd.attenuation.z);
     current_prd.countEmitted = false;
 
     //
@@ -269,6 +283,7 @@ RT_PROGRAM void diffuse()
         const float  nDl   = dot( ffnormal, L );
         const float  LnDl  = dot( light.normal, L );
 
+		//rtPrintf("L=(%f,%f,%f)", L.x, L.y, L.z);
         // cast shadow ray
         if ( nDl > 0.0f && LnDl > 0.0f )
         {
@@ -283,12 +298,18 @@ RT_PROGRAM void diffuse()
                 const float A = length(cross(light.v1, light.v2));
                 // convert area based pdf to solid angle
                 const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
+				//rtPrintf("weight = %f\n", weight);
+				//rtPrintf("emission = (%f,%f,%f)\n", light.emission.x,light.emission.y,light.emission.z);
                 result += light.emission * weight;
+				//Victory!
+				//rtPrintf("result = (%f,%f,%f)\n", result.x, result.y, result.z);
             }
         }
     }
 
     current_prd.radiance = result;
+	//rtPrintf("current_prd.radiance = (%f,%f,%f)\n", current_prd.radiance.x, current_prd.radiance.y, current_prd.radiance.z);
+
 }
 
 

@@ -16,8 +16,8 @@ Camera::Camera()
 }
 
 Camera::Camera(float fov, uint32_t width, uint32_t height)
-	: p_eye(make_float3(278.0f, 273.0f, -900.0f)),
-	  p_lookAt(make_float3(278.0f, 273.0f,0.0f )),
+	: p_eye(make_float3(.0f, 1.0f, 1.0f)),
+	  p_lookAt(make_float3(0.0f, 0.0f,-1.0f )),
 	  p_lookUp(make_float3(0.0f, 1.0f, 0.0f ))
 
 {
@@ -81,6 +81,41 @@ void Camera::setRotate(Matrix4x4 newRot)
 	p_rotate = newRot;
 }
 
+void Camera::keyIn(MOVE_DIR direction)
+{
+	float velocity = 3.0f * 0.1;
+	if (direction == FORWARD)
+	{
+		p_eye += p_w* velocity;
+		p_lookAt += p_w* velocity;
+	}
+	if (direction == BACKWARD)
+	{
+		p_eye-= p_w* velocity;
+		p_lookAt -= p_w* velocity;
+	}
+	if (direction == LEFT)
+	{
+		p_eye-= p_u* velocity;
+		p_lookAt -= p_u* velocity;
+	}
+	if (direction == RIGHT)
+	{
+		p_eye+= p_u* velocity;
+		p_lookAt += p_u* velocity;
+	}
+	if (direction == UP)
+	{
+		p_eye+= p_v* velocity;
+		p_lookAt += p_v* velocity;
+	}
+	if (direction == DOWN)
+	{
+		p_eye-= p_v* velocity;
+		p_lookAt -= p_v* velocity;
+	}
+}
+
 Matrix4x4 Camera::getTransMat(void)
 {
 	return p_trans;
@@ -89,7 +124,8 @@ Matrix4x4 Camera::getTransMat(void)
 void Camera::setTransMat(Matrix4x4 frame)
 {
 	// Apply rotate twice for old SDK for camera.
-	p_trans = frame *getRotate()* getRotate() * frame.inverse(); 
+	p_trans = getRotate()* getRotate();
+	//p_trans = frame *getRotate()* getRotate() * frame.inverse(); 
 
 }
 

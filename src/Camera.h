@@ -8,6 +8,15 @@
 
 using namespace optix;
 
+enum MOVE_DIR {
+	FORWARD,
+	BACKWARD,
+	LEFT,
+	RIGHT,
+	UP,
+	DOWN
+};
+
 class Camera
 {
 public:
@@ -20,6 +29,7 @@ public:
 	float3 getEye(void);
 	float3 getLookAt(void);
 	void setRotate(Matrix4x4 newRot);
+	void keyIn(MOVE_DIR direction);
 
 	float3         getU(void);
 	float3         getV(void);

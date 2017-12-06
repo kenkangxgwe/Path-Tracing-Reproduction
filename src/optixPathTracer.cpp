@@ -110,7 +110,157 @@ std::string ptxPath( const std::string& cuda_file )
 
 Buffer getOutputBuffer()
 {
-    return context[ "output_buffer" ]->getBuffer();
+   Buffer outputbuffer=context[ "output_buffer" ]->getBuffer();
+   Buffer historybuffer = context["history_buffer"]->getBuffer();
+   Buffer normalbuffer = context["normal_buffer"]->getBuffer();
+   Buffer positionbuffer = context["position_buffer"]->getBuffer();
+
+   int buffer_width, buffer_height;
+   outputbuffer->getSize(buffer_width, buffer_height);
+   glEnable(GL_FRAMEBUFFER_SRGB_EXT);
+
+   GLuint outpuvbo;
+   glGenBuffers(1, &outputvbo);
+   glBindBuffer(GL_ARRAY_BUFFER, outputvbo);
+   glBufferData(GL_ARRAY_BUFFER, 4 *buffer_width * buffer_height, 0, GL_STREAM_DRAW);
+   glVertexAttribPointer(8, 3, GL_FLOAT, GL_FALSE,  * sizeof(float), (void*)0);
+   glEnableVertexAttribArray(8);
+   //const unsigned pboId = outputbuffer->getGLBOId();
+   //if (pboId)
+   //{
+	  // static unsigned int gl_tex_id = 0;
+	  // if (!gl_tex_id)
+	  // {
+		 //  glGenTextures(1, &gl_tex_id);
+		 //  glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+
+		 //  // Change these to GL_LINEAR for super- or sub-sampling
+		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+		 //  // GL_CLAMP_TO_EDGE for linear filtering, not relevant for nearest.
+		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	  // }
+	  // glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+	  // // send PBO to texture
+	  // glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
+	  // int elmt_size = buffer->getElementSize();
+	  // if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
+	  // else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	  // else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
+	  // else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+	  // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
+	  // glUniform1i(glGetUniformLocation(ID, "colorMap"), 0);
+	  // glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+   //}
+
+   const unsigned pboId = historybuffer->getGLBOId();
+   if (pboId)
+   {
+	   static unsigned int gl_tex_id = 0;
+	   if (!gl_tex_id)
+	   {
+		   glGenTextures(1, &gl_tex_id);
+		   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+
+		   // Change these to GL_LINEAR for super- or sub-sampling
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+		   // GL_CLAMP_TO_EDGE for linear filtering, not relevant for nearest.
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	   }
+	   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+	   // send PBO to texture
+	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
+	   int elmt_size = buffer->getElementSize();
+	   if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
+	   else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	   else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
+	   else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+	   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
+	   glUniform1i(glGetUniformLocation(ID, "historycolorMap"), 1);
+	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+   }
+
+   const unsigned pboId = normalbuffer->getGLBOId();
+   if (pboId)
+   {
+	   static unsigned int gl_tex_id = 0;
+	   if (!gl_tex_id)
+	   {
+		   glGenTextures(1, &gl_tex_id);
+		   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+
+		   // Change these to GL_LINEAR for super- or sub-sampling
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+		   // GL_CLAMP_TO_EDGE for linear filtering, not relevant for nearest.
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	   }
+	   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+	   // send PBO to texture
+	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
+	   int elmt_size = buffer->getElementSize();
+	   if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
+	   else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	   else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
+	   else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+	   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
+	   glUniform1i(glGetUniformLocation(ID, "normalMap"), 2);
+	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+   }
+   
+   const unsigned pboId = positionbuffer->getGLBOId();
+   if (pboId)
+   {
+	   static unsigned int gl_tex_id = 0;
+	   if (!gl_tex_id)
+	   {
+		   glGenTextures(1, &gl_tex_id);
+		   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+
+		   // Change these to GL_LINEAR for super- or sub-sampling
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+		   // GL_CLAMP_TO_EDGE for linear filtering, not relevant for nearest.
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	   }
+	   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+	   // send PBO to texture
+	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
+	   int elmt_size = buffer->getElementSize();
+	   if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
+	   else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	   else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
+	   else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+	   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
+	   glUniform1i(glGetUniformLocation(ID, "positionMap"), 3);
+	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+   }
+
+
+   glActiveTexture(GL_TEXTURE0);
+   glBindTexture(GL_TEXTURE_2D, diffuseMap);
+   glActiveTexture(GL_TEXTURE1);
+   glBindTexture(GL_TEXTURE_2D, normalMap);
+   glActiveTexture(GL_TEXTURE2);
+   glBindTexture(GL_TEXTURE_2D, heightMap);
+   glActiveTexture(GL_TEXTURE0);
+   glBindTexture(GL_TEXTURE_2D, diffuseMap);
+ 
+
+   return outputbuffer;
 }
 
 

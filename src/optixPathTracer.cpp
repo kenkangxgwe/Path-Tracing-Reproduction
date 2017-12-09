@@ -366,32 +366,46 @@ void loadGeometryFromFile(const std::string &filename)
 {
 	//TODO: make it a class and be able to load a different scene.
     // Light buffer
+    //ParallelogramLight light;
+    //light.corner   = make_float3( -0.24f, 1.88f, -0.22f);
+    //light.v1       = make_float3( 0.0f, 0.0f, 0.38f);
+    //light.v2       = make_float3( 0.47f, 0.0f, 0.0f);
+    //light.normal   = normalize( cross(light.v1, light.v2) );
+    //light.emission = make_float3( 17.0f, 12.0f, 4.0f );
+
     ParallelogramLight light;
-    light.corner   = make_float3( -0.24f, 1.88f, -0.22f);
+    light.corner   = make_float3( -0.24f, 5.88f, 0.52f);
     light.v1       = make_float3( 0.0f, 0.0f, 0.38f);
     light.v2       = make_float3( 0.47f, 0.0f, 0.0f);
     light.normal   = normalize( cross(light.v1, light.v2) );
-    light.emission = make_float3( 17.0f, 12.0f, 4.0f );
- //   ParallelogramLight light;
- //   light.corner   = make_float3( -0.24f, 5.88f, -0.22f);
- //   light.v1       = make_float3( 0.0f, 0.0f, 0.38f);
- //   light.v2       = make_float3( 0.47f, 0.0f, 0.0f);
- //   light.normal   = normalize( cross(light.v1, light.v2) );
- //   light.emission = make_float3( 57.0f, 52.0f, 20.0f );
+    light.emission = make_float3( 457.0f, 452.0f, 420.0f );
 
- //   ParallelogramLight sunlight;
- //   sunlight.corner   = make_float3( 8.24f, 9.88f, -0.22f);
- //   sunlight.v1       = make_float3( 0.0f, 0.0f, 0.38f);
- //   sunlight.v2       = make_float3( 0.47f, 0.47f, 0.0f);
- //   sunlight.normal   = normalize( cross(light.v1, light.v2) );
- //   sunlight.emission = make_float3( 80.0f, 80.0f, 50.0f );
-	//ParallelogramLight lightArray[2] = { light, sunlight };
+    ParallelogramLight light2;
+    light2.corner   = make_float3( 0.0f, 0.0f, 3.52f);
+    light2.v1       = make_float3( -0.47f, 0.0f, 0.38f);
+    light2.v2       = make_float3( 0.0f, 0.47f, 0.0f);
+    light2.normal   = normalize( cross(light2.v1, light2.v2) );
+    light2.emission = make_float3( 457.0f, 452.0f, 420.0f );
+    ParallelogramLight sunlight;
+    sunlight.corner   = make_float3( 5.24f, 9.88f, -0.22f);
+    sunlight.v1       = make_float3( 0.0f, 0.0f, 0.38f);
+    sunlight.v2       = make_float3( 0.47f, 0.0f, 0.0f);
+    sunlight.normal   = normalize( cross(sunlight.v1, sunlight.v2) );
+    sunlight.emission = make_float3( 980.0f, 980.0f, 980.0f );
 
+	ParallelogramLight sunlight2;
+    sunlight2.corner   = make_float3( -5.24f, 9.88f, -0.22f);
+    sunlight2.v1       = make_float3( 0.0f, 0.0f, 0.38f);
+    sunlight2.v2       = make_float3( 0.0f, 0.47f, 0.0f);
+    sunlight2.normal   = normalize( cross(sunlight2.v1, sunlight2.v2) );
+    sunlight2.emission = make_float3( 980.0f, 980.0f, 950.0f );
+
+	ParallelogramLight lightArray[4] = { light, light2, sunlight, sunlight2};
     Buffer light_buffer = context->createBuffer( RT_BUFFER_INPUT );
     light_buffer->setFormat( RT_FORMAT_USER );
     light_buffer->setElementSize( sizeof( ParallelogramLight ) );
-    light_buffer->setSize( 1u );
-    memcpy( light_buffer->map(), &light, sizeof( light) );
+    light_buffer->setSize( 4u );
+    memcpy( light_buffer->map(), &lightArray, sizeof( lightArray) );
     light_buffer->unmap();
     context["lights"]->setBuffer( light_buffer );
 
@@ -399,12 +413,12 @@ void loadGeometryFromFile(const std::string &filename)
     // Set up material
     const std::string cuda_file = std::string( PROGRAM_NAME ) + ".cu";
     std::string ptx_path = ptxPath( cuda_file );
-    Program shader_ch = context->createProgramFromPTXFile( ptx_path, "closest_hit_radiance" );
-    Program shader_ah = context->createProgramFromPTXFile( ptx_path, "any_hit_shadow" );
+    Program shader_ch = context->createProgramFromPTXFile( ptx_path, "shade" );
+    Program shader_ah = context->createProgramFromPTXFile( ptx_path, "shadow" );
 
-    Material diffuse_light = context->createMaterial();
-    Program diffuse_em = context->createProgramFromPTXFile( ptx_path, "diffuseEmitter" );
-    diffuse_light->setClosestHitProgram( 0, diffuse_em );
+    //Material diffuse_light = context->createMaterial();
+    //Program diffuse_em = context->createProgramFromPTXFile( ptx_path, "diffuseEmitter" );
+    //diffuse_light->setClosestHitProgram( 0, diffuse_em );
 
 	OptiXMesh mesh;
 	mesh.context = context;
@@ -687,10 +701,10 @@ int main( int argc, char** argv )
 
         createContext();
         //setupCamera();
-        loadGeometryFromFile("C:/Users/Anseren/Downloads/CornellBox/CornellBox-Original.obj");
+        //loadGeometryFromFile("C:/Users/Anseren/Downloads/CornellBox/CornellBox-Original.obj");
         //loadGeometryFromFile("C:/Users/Anseren/Documents/GitHhub_Projects/Path-Tracing-Reproduction/breakfast_room/breakfast_room.obj");
         //loadGeometryFromFile("C:/ProgramData/NVIDIA Corporation/OptiX SDK 4.1.1/SDK/data/cow.obj");
-
+		loadGeometryFromFile("C:/Users/Anseren/Downloads/sportsCar/sportsCar.obj");
         context->validate();
 
         if ( out_file.empty() )

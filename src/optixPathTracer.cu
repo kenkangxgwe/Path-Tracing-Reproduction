@@ -1,31 +1,3 @@
-/*
- * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
 #include <optixu/optixu_math_namespace.h>
 #include "optixPathTracer.h"
 #include "random.h"
@@ -62,13 +34,31 @@ __device__ int reset()
 	return 10;
 }
 
+//this function randomly picks a point on the scope of a cone that's assciated to the
+//specular function.
+__device__ void sample_lobe_cone(float z1, float z2, float expn, float3 reflect, float3 &p)
+{
+	// azimuth angle
+	const float phi = 2 * M_PIf * z2;
+	// elevation angle
+	const float alpha = acosf(pow(z1, 1 / (expn+1)));
+	const float cp = cosf(phi);
+	const float sp = sinf(phi);
+	const float sa = sinf(alpha);
+	const float ca = cosf(alpha);
+						
+	p.x = reflect.x *  (cp*cp * ca + sa*sa) + reflect.y * (ca - 1) * cp * sp + reflect.z * cp * sa;
+	p.y = reflect.x * ((ca - 1) * cp * sp) + reflect.y * (cp*cp + sa * sp*sp) + reflect.z * sa * sp;
+	p.z = reflect.x * -cp * sa + reflect.y * (-1 * sa) * sp + reflect.z* ca;
+
+	// calculate vector p in the scope of our cone. 
+}
+
 // Scene wide variables
 rtDeclareVariable(float,         scene_epsilon, , );
 rtDeclareVariable(rtObject,      top_object, , );
 rtDeclareVariable(uint2,         launch_index, rtLaunchIndex, );
-
 rtDeclareVariable(PerRayData_pathtrace, current_prd, rtPayload, );
-
 
 
 //-----------------------------------------------------------------------------
@@ -142,8 +132,6 @@ RT_PROGRAM void pathtrace_camera()
             {
                 // We have hit the background or a luminaire
                 prd.result += prd.radiance * prd.attenuation;
-				//Victory!
-				//rtPrintf("result = (%f,%f,%f)\n", prd.result.x, prd.result.y, prd.result.z);
                 break;
             }
 
@@ -158,7 +146,6 @@ RT_PROGRAM void pathtrace_camera()
 
             prd.depth++;
             prd.result += prd.radiance * prd.attenuation;
-			//rtPrintf("result = (%f,%f,%f)\n", prd.result.x, prd.result.y, prd.result.z);
 
             // Update ray data for the next path segment
 			if (prd.depth == 1) {
@@ -204,13 +191,13 @@ RT_PROGRAM void pathtrace_camera()
 //
 //-----------------------------------------------------------------------------
 
-rtDeclareVariable(float3,        emission_color, , );
-
-RT_PROGRAM void diffuseEmitter()
-{
-    current_prd.radiance = current_prd.countEmitted ? emission_color : make_float3(0.f);
-    current_prd.done = true;
-}
+//rtDeclareVariable(float3,        emission_color, , );
+//
+//RT_PROGRAM void diffuseEmitter()
+//{
+//    current_prd.radiance = current_prd.countEmitted ? emission_color : make_float3(0.f);
+//    current_prd.done = true;
+//}
 
 
 //-----------------------------------------------------------------------------
@@ -219,16 +206,17 @@ RT_PROGRAM void diffuseEmitter()
 //
 //-----------------------------------------------------------------------------
 
-//rtDeclareVariable(float3,     diffuse_color, , );
 rtDeclareVariable(float3,     Kd, , );
 rtDeclareVariable(float3,     Ke, , );
+rtDeclareVariable(float3,     Ks, , );
+rtDeclareVariable(float,      phong_exp, , );
 rtDeclareVariable(float3,     geometric_normal, attribute geometric_normal, );
 rtDeclareVariable(float3,     shading_normal,   attribute shading_normal, );
 rtDeclareVariable(optix::Ray, ray,              rtCurrentRay, ); 
 rtDeclareVariable(float,      t_hit,            rtIntersectionDistance, );
 
 
-RT_PROGRAM void diffuse()
+RT_PROGRAM void shade()
 {
 	if (Ke.x != 0.f || Ke.y != 0.f || Ke.z != 0.f) {
 		current_prd.radiance = current_prd.countEmitted ? Ke : make_float3(0.f);
@@ -249,18 +237,23 @@ RT_PROGRAM void diffuse()
 
     float z1=rnd(current_prd.seed);
     float z2=rnd(current_prd.seed);
+	// a random point generated based on the hemi-circle that centered at z1 and
+	// has z2 as the radius.
     float3 p;
-    cosine_sample_hemisphere(z1, z2, p);
+	const float3  R = ray.direction - 2 * dot(ray.direction, ffnormal) * ffnormal;
+
+	if (Ks.x + Ks.y + Ks.z != 0)
+		sample_lobe_cone(z1, z2, phong_exp, R, p);
+		//cosine_sample_hemisphere(z1, z2, p);
+	else
+		cosine_sample_hemisphere(z1, z2, p);
     optix::Onb onb( ffnormal );
     onb.inverse_transform( p );
     current_prd.direction = p;
 	current_prd.normal = world_shading_normal;
     // NOTE: f/pdf = 1 since we are perfectly importance sampling lambertian
     // with cosine density.
-    //current_prd.attenuation = current_prd.attenuation * diffuse_color;
     current_prd.attenuation = current_prd.attenuation * Kd;
-	//Victory!
-	//rtPrintf("attenuation = (%f, %f, %f)\n", current_prd.attenuation.x, current_prd.attenuation.y, current_prd.attenuation.z);
     current_prd.countEmitted = false;
 
     //
@@ -282,10 +275,10 @@ RT_PROGRAM void diffuse()
         const float3 L     = normalize(light_pos - hitpoint);
         const float  nDl   = dot( ffnormal, L );
         const float  LnDl  = dot( light.normal, L );
-
-		//rtPrintf("L=(%f,%f,%f)", L.x, L.y, L.z);
+		const float3  H = normalize(-ray.direction + L);
+		const float nDh = dot(ffnormal, H);
         // cast shadow ray
-        if ( nDl > 0.0f && LnDl > 0.0f )
+        if ( nDl > 0.0f && LnDl > 0.0f && nDh > 0.0f)
         {
             PerRayData_pathtrace_shadow shadow_prd;
             shadow_prd.inShadow = false;
@@ -297,18 +290,15 @@ RT_PROGRAM void diffuse()
             {
                 const float A = length(cross(light.v1, light.v2));
                 // convert area based pdf to solid angle
-                const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-				//rtPrintf("weight = %f\n", weight);
-				//rtPrintf("emission = (%f,%f,%f)\n", light.emission.x,light.emission.y,light.emission.z);
-                result += light.emission * weight;
-				//Victory!
-				//rtPrintf("result = (%f,%f,%f)\n", result.x, result.y, result.z);
+                const float weight = ( pow(nDh, phong_exp) +  nDl * LnDl) * A / (M_PIf * Ldist * Ldist);
+                const float weightD = ( nDl * LnDl) * A / (M_PIf * Ldist * Ldist);
+                const float weightS = ( pow(nDh, phong_exp) ) * A / (M_PIf * Ldist * Ldist);
+				result += light.emission * (Kd * (weightD) + Ks * (weightS));
             }
         }
     }
 
     current_prd.radiance = result;
-	//rtPrintf("current_prd.radiance = (%f,%f,%f)\n", current_prd.radiance.x, current_prd.radiance.y, current_prd.radiance.z);
 
 }
 

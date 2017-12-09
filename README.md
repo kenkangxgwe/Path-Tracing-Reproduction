@@ -16,6 +16,8 @@ A path tracing implementation based on the OptiX SDK sample.
 
 4. Reload the Solution if prompt. Goto step 2 until all projects succeed.
 
-## Original Effect
-### Cornell Box
-![cbox_ori](https://github.com/kenkangxgwe/Path-Tracing-Reproduction/blob/master/data/doc/optixPathTracer.png?raw=true)
+## Screenshots
+### Original
+![cbox_ori](https://github.com/kenkangxgwe/Path-Tracing-Reproduction/blob/master/data/doc/original.png?raw=true)
+### Filtered
+![cbox_fil](https://github.com/kenkangxgwe/Path-Tracing-Reproduction/blob/master/data/doc/filtered.png?raw=true)

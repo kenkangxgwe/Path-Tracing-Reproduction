@@ -66,7 +66,6 @@ Buffer getOutputBuffer();
 void destroyContext();
 void registerExitHandler();
 void createContext();
-void loadGeometry();
 void loadGeometryFromFile(const std::string &filename);
 void updateCamera();
 void glutInitialize( int* argc, char** argv );
@@ -111,21 +110,52 @@ std::string ptxPath( const std::string& cuda_file )
 Buffer getOutputBuffer()
 {
    Buffer outputbuffer=context[ "output_buffer" ]->getBuffer();
-   Buffer historybuffer = context["history_buffer"]->getBuffer();
-   Buffer normalbuffer = context["normal_buffer"]->getBuffer();
-   Buffer positionbuffer = context["position_buffer"]->getBuffer();
+   //Buffer historybuffer = context["history_buffer"]->getBuffer();
+   //Buffer normalbuffer = context["normal_buffer"]->getBuffer();
+   //Buffer positionbuffer = context["position_buffer"]->getBuffer();
 
-   int buffer_width, buffer_height;
-   outputbuffer->getSize(buffer_width, buffer_height);
-   glEnable(GL_FRAMEBUFFER_SRGB_EXT);
+   //int buffer_width, buffer_height;
+   //outputbuffer->getSize(buffer_width, buffer_height);
+   //glEnable(GL_FRAMEBUFFER_SRGB_EXT);
 
-   GLuint outpuvbo;
-   glGenBuffers(1, &outputvbo);
-   glBindBuffer(GL_ARRAY_BUFFER, outputvbo);
-   glBufferData(GL_ARRAY_BUFFER, 4 *buffer_width * buffer_height, 0, GL_STREAM_DRAW);
-   glVertexAttribPointer(8, 3, GL_FLOAT, GL_FALSE,  * sizeof(float), (void*)0);
-   glEnableVertexAttribArray(8);
-   //const unsigned pboId = outputbuffer->getGLBOId();
+   //GLuint outpuvbo;
+   //glGenBuffers(1, &outputvbo);
+   //glBindBuffer(GL_ARRAY_BUFFER, outputvbo);
+   //glBufferData(GL_ARRAY_BUFFER, 4 *buffer_width * buffer_height, 0, GL_STREAM_DRAW);
+   //glVertexAttribPointer(8, 3, GL_FLOAT, GL_FALSE,  * sizeof(float), (void*)0);
+   //glEnableVertexAttribArray(8);
+   ////const unsigned pboId = outputbuffer->getGLBOId();
+   ////if (pboId)
+   ////{
+	  //// static unsigned int gl_tex_id = 0;
+	  //// if (!gl_tex_id)
+	  //// {
+		 ////  glGenTextures(1, &gl_tex_id);
+		 ////  glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+
+		 ////  // Change these to GL_LINEAR for super- or sub-sampling
+		 ////  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		 ////  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+		 ////  // GL_CLAMP_TO_EDGE for linear filtering, not relevant for nearest.
+		 ////  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		 ////  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	  //// }
+	  //// glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+	  //// // send PBO to texture
+	  //// glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
+	  //// int elmt_size = buffer->getElementSize();
+	  //// if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
+	  //// else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	  //// else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
+	  //// else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+	  //// glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
+	  //// glUniform1i(glGetUniformLocation(ID, "colorMap"), 0);
+	  //// glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+   ////}
+
+   //const unsigned pboId = historybuffer->getGLBOId();
    //if (pboId)
    //{
 	  // static unsigned int gl_tex_id = 0;
@@ -152,112 +182,81 @@ Buffer getOutputBuffer()
 	  // else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 	  // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
-	  // glUniform1i(glGetUniformLocation(ID, "colorMap"), 0);
+	  // glUniform1i(glGetUniformLocation(ID, "historycolorMap"), 1);
 	  // glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
    //}
 
-   const unsigned pboId = historybuffer->getGLBOId();
-   if (pboId)
-   {
-	   static unsigned int gl_tex_id = 0;
-	   if (!gl_tex_id)
-	   {
-		   glGenTextures(1, &gl_tex_id);
-		   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+   //const unsigned pboId = normalbuffer->getGLBOId();
+   //if (pboId)
+   //{
+	  // static unsigned int gl_tex_id = 0;
+	  // if (!gl_tex_id)
+	  // {
+		 //  glGenTextures(1, &gl_tex_id);
+		 //  glBindTexture(GL_TEXTURE_2D, gl_tex_id);
 
-		   // Change these to GL_LINEAR for super- or sub-sampling
-		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		 //  // Change these to GL_LINEAR for super- or sub-sampling
+		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
-		   // GL_CLAMP_TO_EDGE for linear filtering, not relevant for nearest.
-		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	   }
-	   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
-	   // send PBO to texture
-	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
-	   int elmt_size = buffer->getElementSize();
-	   if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
-	   else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-	   else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
-	   else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		 //  // GL_CLAMP_TO_EDGE for linear filtering, not relevant for nearest.
+		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	  // }
+	  // glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+	  // // send PBO to texture
+	  // glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
+	  // int elmt_size = buffer->getElementSize();
+	  // if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
+	  // else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	  // else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
+	  // else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-	   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
-	   glUniform1i(glGetUniformLocation(ID, "historycolorMap"), 1);
-	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-   }
+	  // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
+	  // glUniform1i(glGetUniformLocation(ID, "normalMap"), 2);
+	  // glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+   //}
+   //
+   //const unsigned pboId = positionbuffer->getGLBOId();
+   //if (pboId)
+   //{
+	  // static unsigned int gl_tex_id = 0;
+	  // if (!gl_tex_id)
+	  // {
+		 //  glGenTextures(1, &gl_tex_id);
+		 //  glBindTexture(GL_TEXTURE_2D, gl_tex_id);
 
-   const unsigned pboId = normalbuffer->getGLBOId();
-   if (pboId)
-   {
-	   static unsigned int gl_tex_id = 0;
-	   if (!gl_tex_id)
-	   {
-		   glGenTextures(1, &gl_tex_id);
-		   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+		 //  // Change these to GL_LINEAR for super- or sub-sampling
+		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
-		   // Change these to GL_LINEAR for super- or sub-sampling
-		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		 //  // GL_CLAMP_TO_EDGE for linear filtering, not relevant for nearest.
+		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	  // }
+	  // glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+	  // // send PBO to texture
+	  // glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
+	  // int elmt_size = buffer->getElementSize();
+	  // if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
+	  // else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	  // else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
+	  // else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-		   // GL_CLAMP_TO_EDGE for linear filtering, not relevant for nearest.
-		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	   }
-	   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
-	   // send PBO to texture
-	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
-	   int elmt_size = buffer->getElementSize();
-	   if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
-	   else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-	   else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
-	   else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-	   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
-	   glUniform1i(glGetUniformLocation(ID, "normalMap"), 2);
-	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-   }
-   
-   const unsigned pboId = positionbuffer->getGLBOId();
-   if (pboId)
-   {
-	   static unsigned int gl_tex_id = 0;
-	   if (!gl_tex_id)
-	   {
-		   glGenTextures(1, &gl_tex_id);
-		   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
-
-		   // Change these to GL_LINEAR for super- or sub-sampling
-		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-		   // GL_CLAMP_TO_EDGE for linear filtering, not relevant for nearest.
-		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	   }
-	   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
-	   // send PBO to texture
-	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
-	   int elmt_size = buffer->getElementSize();
-	   if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
-	   else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-	   else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
-	   else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-	   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
-	   glUniform1i(glGetUniformLocation(ID, "positionMap"), 3);
-	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-   }
+	  // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
+	  // glUniform1i(glGetUniformLocation(ID, "positionMap"), 3);
+	  // glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+   //}
 
 
-   glActiveTexture(GL_TEXTURE0);
-   glBindTexture(GL_TEXTURE_2D, diffuseMap);
-   glActiveTexture(GL_TEXTURE1);
-   glBindTexture(GL_TEXTURE_2D, normalMap);
-   glActiveTexture(GL_TEXTURE2);
-   glBindTexture(GL_TEXTURE_2D, heightMap);
-   glActiveTexture(GL_TEXTURE0);
-   glBindTexture(GL_TEXTURE_2D, diffuseMap);
+   //glActiveTexture(GL_TEXTURE0);
+   //glBindTexture(GL_TEXTURE_2D, diffuseMap);
+   //glActiveTexture(GL_TEXTURE1);
+   //glBindTexture(GL_TEXTURE_2D, normalMap);
+   //glActiveTexture(GL_TEXTURE2);
+   //glBindTexture(GL_TEXTURE_2D, heightMap);
+   //glActiveTexture(GL_TEXTURE0);
+   //glBindTexture(GL_TEXTURE_2D, diffuseMap);
  
 
    return outputbuffer;
@@ -400,8 +399,8 @@ void loadGeometryFromFile(const std::string &filename)
     // Set up material
     const std::string cuda_file = std::string( PROGRAM_NAME ) + ".cu";
     std::string ptx_path = ptxPath( cuda_file );
-    Program diffuse_ch = context->createProgramFromPTXFile( ptx_path, "diffuse" );
-    Program diffuse_ah = context->createProgramFromPTXFile( ptx_path, "shadow" );
+    Program shader_ch = context->createProgramFromPTXFile( ptx_path, "closest_hit_radiance" );
+    Program shader_ah = context->createProgramFromPTXFile( ptx_path, "any_hit_shadow" );
 
     Material diffuse_light = context->createMaterial();
     Program diffuse_em = context->createProgramFromPTXFile( ptx_path, "diffuseEmitter" );
@@ -409,8 +408,8 @@ void loadGeometryFromFile(const std::string &filename)
 
 	OptiXMesh mesh;
 	mesh.context = context;
-	mesh.closest_hit = diffuse_ch;
-	mesh.any_hit = diffuse_ah;
+	mesh.closest_hit = shader_ch;
+	mesh.any_hit = shader_ah;
 	loadMesh(filename, mesh);
 
     GeometryGroup shadow_group = context->createGeometryGroup();
@@ -423,152 +422,6 @@ void loadGeometryFromFile(const std::string &filename)
 	transformedToWorld->validate();
 
     context["top_object"]->set(transformedToWorld);
-}
-
-void loadGeometry()
-{
-	//TODO: make it a class and be able to load a different scene.
-    // Light buffer
-    ParallelogramLight light;
-    light.corner   = make_float3( 343.0f, 548.6f, 227.0f);
-    light.v1       = make_float3( -130.0f, 0.0f, 0.0f);
-    light.v2       = make_float3( 0.0f, 0.0f, 105.0f);
-    light.normal   = normalize( cross(light.v1, light.v2) );
-    light.emission = make_float3( 15.0f, 15.0f, 5.0f );
-
-    Buffer light_buffer = context->createBuffer( RT_BUFFER_INPUT );
-    light_buffer->setFormat( RT_FORMAT_USER );
-	std::cout << sizeof(ParallelogramLight) << std::endl;
-    light_buffer->setElementSize( sizeof( ParallelogramLight ) );
-    light_buffer->setSize( 1u );
-    memcpy( light_buffer->map(), &light, sizeof( light ) );
-    light_buffer->unmap();
-    context["lights"]->setBuffer( light_buffer );
-
-
-    // Set up material
-    const std::string cuda_file = std::string( PROGRAM_NAME ) + ".cu";
-    std::string ptx_path = ptxPath( cuda_file );
-    Material diffuse = context->createMaterial();
-    Program diffuse_ch = context->createProgramFromPTXFile( ptx_path, "diffuse" );
-    Program diffuse_ah = context->createProgramFromPTXFile( ptx_path, "shadow" );
-    diffuse->setClosestHitProgram( 0, diffuse_ch );
-    diffuse->setAnyHitProgram( 1, diffuse_ah );
-
-    Material diffuse_light = context->createMaterial();
-    Program diffuse_em = context->createProgramFromPTXFile( ptx_path, "diffuseEmitter" );
-    diffuse_light->setClosestHitProgram( 0, diffuse_em );
-
-    // Set up parallelogram programs
-    ptx_path = ptxPath( "parallelogram.cu" );
-    pgram_bounding_box = context->createProgramFromPTXFile( ptx_path, "bounds" );
-    pgram_intersection = context->createProgramFromPTXFile( ptx_path, "intersect" );
-
-    // create geometry instances
-    std::vector<GeometryInstance> gis;
-
-    const float3 white = make_float3( 0.8f, 0.8f, 0.8f );
-    const float3 green = make_float3( 0.05f, 0.8f, 0.05f );
-    const float3 red   = make_float3( 0.8f, 0.05f, 0.05f );
-    const float3 light_em = make_float3( 15.0f, 15.0f, 5.0f );
-
-    // Floor
-    gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 0.0f ),
-                                        make_float3( 0.0f, 0.0f, 559.2f ),
-                                        make_float3( 556.0f, 0.0f, 0.0f ) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-
-    // Ceiling
-    gis.push_back( createParallelogram( make_float3( 0.0f, 548.8f, 0.0f ),
-                                        make_float3( 556.0f, 0.0f, 0.0f ),
-                                        make_float3( 0.0f, 0.0f, 559.2f ) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-
-    // Back wall
-    gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 559.2f),
-                                        make_float3( 0.0f, 548.8f, 0.0f),
-                                        make_float3( 556.0f, 0.0f, 0.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-
-    // Right wall
-    gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 0.0f ),
-                                        make_float3( 0.0f, 548.8f, 0.0f ),
-                                        make_float3( 0.0f, 0.0f, 559.2f ) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", green);
-
-    // Left wall
-    gis.push_back( createParallelogram( make_float3( 556.0f, 0.0f, 0.0f ),
-                                        make_float3( 0.0f, 0.0f, 559.2f ),
-                                        make_float3( 0.0f, 548.8f, 0.0f ) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", red);
-
-    // Short block
-    gis.push_back( createParallelogram( make_float3( 130.0f, 165.0f, 65.0f),
-                                        make_float3( -48.0f, 0.0f, 160.0f),
-                                        make_float3( 160.0f, 0.0f, 49.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 290.0f, 0.0f, 114.0f),
-                                        make_float3( 0.0f, 165.0f, 0.0f),
-                                        make_float3( -50.0f, 0.0f, 158.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 130.0f, 0.0f, 65.0f),
-                                        make_float3( 0.0f, 165.0f, 0.0f),
-                                        make_float3( 160.0f, 0.0f, 49.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 82.0f, 0.0f, 225.0f),
-                                        make_float3( 0.0f, 165.0f, 0.0f),
-                                        make_float3( 48.0f, 0.0f, -160.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 240.0f, 0.0f, 272.0f),
-                                        make_float3( 0.0f, 165.0f, 0.0f),
-                                        make_float3( -158.0f, 0.0f, -47.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-
-    // Tall block
-    gis.push_back( createParallelogram( make_float3( 423.0f, 330.0f, 247.0f),
-                                        make_float3( -158.0f, 0.0f, 49.0f),
-                                        make_float3( 49.0f, 0.0f, 159.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 423.0f, 0.0f, 247.0f),
-                                        make_float3( 0.0f, 330.0f, 0.0f),
-                                        make_float3( 49.0f, 0.0f, 159.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 472.0f, 0.0f, 406.0f),
-                                        make_float3( 0.0f, 330.0f, 0.0f),
-                                        make_float3( -158.0f, 0.0f, 50.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 314.0f, 0.0f, 456.0f),
-                                        make_float3( 0.0f, 330.0f, 0.0f),
-                                        make_float3( -49.0f, 0.0f, -160.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 265.0f, 0.0f, 296.0f),
-                                        make_float3( 0.0f, 330.0f, 0.0f),
-                                        make_float3( 158.0f, 0.0f, -49.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-
-    // Create shadow group (no light)
-    GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
-    shadow_group->setAcceleration( context->createAcceleration( "Trbvh" ) );
-	Transform transformedShadow = context->createTransform();
-	transformedShadow->setMatrix(false, Matrix4x4::scale(make_float3(0.5f)).getData(), NULL);
-	transformedShadow->setChild(shadow_group);
-    context["top_shadower"]->set( transformedShadow );
-	transformedShadow->validate();
-
-    // Light
-    gis.push_back( createParallelogram( make_float3( 343.0f, 548.6f, 227.0f),
-                                        make_float3( -130.0f, 0.0f, 0.0f),
-                                        make_float3( 0.0f, 0.0f, 105.0f) ) );
-    setMaterial(gis.back(), diffuse_light, "emission_color", light_em);
-
-    // Create geometry group
-    GeometryGroup geometry_group = context->createGeometryGroup(gis.begin(), gis.end());
-    geometry_group->setAcceleration( context->createAcceleration( "Trbvh" ) );
-	Transform transformedGeometry = context->createTransform();
-	transformedGeometry->setMatrix(false, Matrix4x4::scale(make_float3(0.5f)).getData(), NULL);
-	transformedGeometry->setChild(geometry_group);
-    context["top_object"]->set( transformedGeometry );
-	transformedGeometry->validate();
 }
 
 
@@ -834,7 +687,6 @@ int main( int argc, char** argv )
 
         createContext();
         //setupCamera();
-		//loadGeometry();
         loadGeometryFromFile("C:/Users/Anseren/Downloads/CornellBox/CornellBox-Original.obj");
         //loadGeometryFromFile("C:/Users/Anseren/Documents/GitHhub_Projects/Path-Tracing-Reproduction/breakfast_room/breakfast_room.obj");
         //loadGeometryFromFile("C:/ProgramData/NVIDIA Corporation/OptiX SDK 4.1.1/SDK/data/cow.obj");

@@ -1,8 +1,8 @@
 #include "Camera.h"
 
 Camera::Camera()
-	: p_eye(make_float3(278.0f, 273.0f, -900.0f)),
-	  p_lookAt(make_float3(278.0f, 273.0f,0.0f )),
+	: p_eye(make_float3(.0f, 1.0f, 1.0f)),
+	  p_lookAt(make_float3(0.0f, 0.0f,-1.0f )),
 	  p_lookUp(make_float3(0.0f, 1.0f, 0.0f ))
 {
 	const float fov= 35.0f;
@@ -16,8 +16,8 @@ Camera::Camera()
 }
 
 Camera::Camera(float fov, uint32_t width, uint32_t height)
-	: p_eye(make_float3(.0f, 1.0f, 1.0f)),
-	  p_lookAt(make_float3(0.0f, 0.0f,-1.0f )),
+	: p_eye(make_float3(-0.0f, 1.0f, 5.0f)),
+	  p_lookAt(make_float3(-0.0f, 1.0f,-1.04f )),
 	  p_lookUp(make_float3(0.0f, 1.0f, 0.0f ))
 
 {

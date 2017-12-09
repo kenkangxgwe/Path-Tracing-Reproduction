@@ -17,6 +17,7 @@
 #include <sutil.h>
 #include <Arcball.h>
 #include "Camera.h"
+#include "shader.h"
 #include <algorithm>
 #include <OptiXMesh.h>
 #include <cstring>
@@ -53,6 +54,10 @@ Camera *myCam = new Camera(fov, width, height);
 // Mouse state
 int2           mouse_prev_pos;
 int            mouse_button;
+
+//
+GLuint outputvbo;
+unsigned int VBO, VAO, EBO;
 
 
 //------------------------------------------------------------------------------
@@ -106,57 +111,76 @@ std::string ptxPath( const std::string& cuda_file )
         cuda_file +
         ".ptx";
 }
-
-
+//
 Buffer getOutputBuffer()
 {
+	return context["output_buffer"]->getBuffer();
+}
+
+Buffer getOutputBuffer2()
+{
    Buffer outputbuffer=context[ "output_buffer" ]->getBuffer();
-   Buffer historybuffer = context["history_buffer"]->getBuffer();
+   Buffer historybuffer	 = context["history_buffer"]->getBuffer();
    Buffer normalbuffer = context["normal_buffer"]->getBuffer();
    Buffer positionbuffer = context["position_buffer"]->getBuffer();
 
-   int buffer_width, buffer_height;
+   unsigned __int64 buffer_width, buffer_height;
    outputbuffer->getSize(buffer_width, buffer_height);
    glEnable(GL_FRAMEBUFFER_SRGB_EXT);
 
-   GLuint outpuvbo;
-   glGenBuffers(1, &outputvbo);
-   glBindBuffer(GL_ARRAY_BUFFER, outputvbo);
-   glBufferData(GL_ARRAY_BUFFER, 4 *buffer_width * buffer_height, 0, GL_STREAM_DRAW);
-   glVertexAttribPointer(8, 3, GL_FLOAT, GL_FALSE,  * sizeof(float), (void*)0);
-   glEnableVertexAttribArray(8);
-   //const unsigned pboId = outputbuffer->getGLBOId();
-   //if (pboId)
-   //{
-	  // static unsigned int gl_tex_id = 0;
-	  // if (!gl_tex_id)
-	  // {
-		 //  glGenTextures(1, &gl_tex_id);
-		 //  glBindTexture(GL_TEXTURE_2D, gl_tex_id);
 
-		 //  // Change these to GL_LINEAR for super- or sub-sampling
-		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+   glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputvbo);
+   glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float4)*buffer_width * buffer_height, 0, GL_STREAM_DRAW);
+   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, outputvbo);
+   glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-		 //  // GL_CLAMP_TO_EDGE for linear filtering, not relevant for nearest.
-		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		 //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	  // }
-	  // glBindTexture(GL_TEXTURE_2D, gl_tex_id);
-	  // // send PBO to texture
-	  // glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
-	  // int elmt_size = buffer->getElementSize();
-	  // if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
-	  // else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-	  // else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
-	  // else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-	  // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
-	  // glUniform1i(glGetUniformLocation(ID, "colorMap"), 0);
-	  // glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-   //}
+   Shader filter("../../src/filter.vert","../../src/filter.frag");
 
-   const unsigned pboId = historybuffer->getGLBOId();
+
+   float vertices[] = {
+	   1.0f, 1.0f,0.0f,     1.0f, 1.0f,
+	   1.0f, -1.0f,0.0f,	1.0f, 0.0f,
+	   -1.0f, -1.0f,0.0f,	0.0f, 0.0f,
+	   -1.0f, 1.0f,0.0f,	0.0f, 1.0f
+   };
+   unsigned int indices[] = {
+	   0, 1, 3, // first triangle
+	   1, 2, 3  // second triangle
+   };
+
+ 
+ 
+
+   glBindVertexArray(VAO);
+
+   glBindBuffer(GL_ARRAY_BUFFER, VBO);
+   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO); 
+   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+   glEnableVertexAttribArray(0);
+
+
+   glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+   glEnableVertexAttribArray(1);
+ 
+
+
+   static unsigned int outputmap;
+   static unsigned int historymap;
+   static unsigned int normalmap;
+   static unsigned int positionmap;
+   filter.Use();
+
+   glUniform2i(glGetUniformLocation(filter.Program, "screenSize"), buffer_width, buffer_height);
+   glUniform1i(glGetUniformLocation(filter.Program, "width"), buffer_width);
+   glUniform1i(glGetUniformLocation(filter.Program, "height"), buffer_height);
+
+
+   unsigned pboId = outputbuffer->getGLBOId();
    if (pboId)
    {
 	   static unsigned int gl_tex_id = 0;
@@ -176,18 +200,23 @@ Buffer getOutputBuffer()
 	   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
 	   // send PBO to texture
 	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
-	   int elmt_size = buffer->getElementSize();
+	   //glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+	   //glEnableVertexAttribArray(0);
+	   int elmt_size = outputbuffer->getElementSize();
 	   if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
 	   else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 	   else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
 	   else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 	   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
-	   glUniform1i(glGetUniformLocation(ID, "historycolorMap"), 1);
+	  // filter.Use();
+	   glUniform1i(glGetUniformLocation(filter.Program, "colorMap"), 0);
+	   outputmap = gl_tex_id;
+	  // glBindTexture(GL_TEXTURE_2D, 0);
 	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
    }
 
-   const unsigned pboId = normalbuffer->getGLBOId();
+   pboId = historybuffer->getGLBOId();
    if (pboId)
    {
 	   static unsigned int gl_tex_id = 0;
@@ -207,18 +236,54 @@ Buffer getOutputBuffer()
 	   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
 	   // send PBO to texture
 	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
-	   int elmt_size = buffer->getElementSize();
+	   int elmt_size = historybuffer->getElementSize();
 	   if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
 	   else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 	   else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
 	   else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 	   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
-	   glUniform1i(glGetUniformLocation(ID, "normalMap"), 2);
+	//   filter.Use();
+	   glUniform1i(glGetUniformLocation(filter.Program, "historycolorMap"), 1);
+	   historymap = gl_tex_id;
 	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+   }
+
+   pboId = normalbuffer->getGLBOId();
+   if (pboId)
+   {
+	   static unsigned int gl_tex_id = 0;
+	   if (!gl_tex_id)
+	   {
+		   glGenTextures(1, &gl_tex_id);
+		   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+
+		   // Change these to GL_LINEAR for super- or sub-sampling
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+		   // GL_CLAMP_TO_EDGE for linear filtering, not relevant for nearest.
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	   }
+	   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
+	   // send PBO to texture
+	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
+	   int elmt_size = normalbuffer->getElementSize();
+	   if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
+	   else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	   else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
+	   else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+	   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
+	 //  filter.Use();
+	   glUniform1i(glGetUniformLocation(filter.Program, "normalMap"), 2);
+	   normalmap = gl_tex_id;
+	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+
    }
    
-   const unsigned pboId = positionbuffer->getGLBOId();
+   pboId = positionbuffer->getGLBOId();
    if (pboId)
    {
 	   static unsigned int gl_tex_id = 0;
@@ -238,27 +303,77 @@ Buffer getOutputBuffer()
 	   glBindTexture(GL_TEXTURE_2D, gl_tex_id);
 	   // send PBO to texture
 	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
-	   int elmt_size = buffer->getElementSize();
+	   int elmt_size = positionbuffer->getElementSize();
 	   if (elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
 	   else if (elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 	   else if (elmt_size % 2 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
 	   else                          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 	   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
-	   glUniform1i(glGetUniformLocation(ID, "positionMap"), 3);
+	   positionmap= gl_tex_id;
+	  // filter.Use();
+	   glUniform1i(glGetUniformLocation(filter.Program, "positionMap"), 3);
 	   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
    }
-
+   /*float kernel[5] = {
+	   1.0f,1.0f / 4.0f,3.0f / 8.0f,1.0f / 4.0f,1.0f / 16.0f
+   };
+   unsigned int kernelID;
+   glGenBuffers(1, &kernelID);
+   glBindBuffer(GL_ARRAY_BUFFER, kernelID);
+   glBufferData(GL_ARRAY_BUFFER, sizeof(kernel), kernel, GL_STATIC_DRAW);
+   glUniform1i(glGetUniformLocation(filter.Program, "kernel"), kernelID);*/
 
    glActiveTexture(GL_TEXTURE0);
-   glBindTexture(GL_TEXTURE_2D, diffuseMap);
+   glBindTexture(GL_TEXTURE_2D, outputmap);
    glActiveTexture(GL_TEXTURE1);
-   glBindTexture(GL_TEXTURE_2D, normalMap);
+   glBindTexture(GL_TEXTURE_2D, historymap);
    glActiveTexture(GL_TEXTURE2);
-   glBindTexture(GL_TEXTURE_2D, heightMap);
-   glActiveTexture(GL_TEXTURE0);
-   glBindTexture(GL_TEXTURE_2D, diffuseMap);
- 
+   glBindTexture(GL_TEXTURE_2D, normalmap);
+   glActiveTexture(GL_TEXTURE3);
+   glBindTexture(GL_TEXTURE_2D,positionmap);
+
+  // return outputbuffer;
+   glClear(GL_COLOR_BUFFER_BIT);
+   filter.Use();
+   //set data to output buffer
+   //glutSwapBuffers();
+   //
+   glBindVertexArray(VAO);
+   glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+   //glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputvbo);
+   //GLvoid* imageData = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_WRITE);
+   //glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+   //glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+   //glCopyNamedBufferSubData(outputvbo,
+	  // historybuffer,
+	  // 0,
+	  // 0,
+	  // sizeof(float4)*buffer_width * buffer_height);
+
+   //outputbuffer->unregisterGLBuffer();
+   //pboId = outputbuffer->getGLBOId();
+   //glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
+   //glBufferData(GL_PIXEL_UNPACK_BUFFER, outputbuffer->getElementSize() * buffer_height * buffer_width, imageData, GL_STREAM_DRAW);
+   //glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+   //outputbuffer->registerGLBuffer();
+
+   //historybuffer->unregisterGLBuffer();
+   //pboId = historybuffer->getGLBOId();
+   //glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboId);
+   //glBufferData(GL_PIXEL_UNPACK_BUFFER, historybuffer->getElementSize() * buffer_height * buffer_width, imageData, GL_STREAM_DRAW);
+   //glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+   //historybuffer->registerGLBuffer();
+
+
+   {
+	   static unsigned frame_count = 0;
+	   sutil::displayFps(frame_count++);
+   }
+   glutSwapBuffers();
+
 
    return outputbuffer;
 }
@@ -341,14 +456,21 @@ void createContext()
     Buffer buffer = sutil::createOutputBuffer( context, RT_FORMAT_FLOAT4, width, height, use_pbo );
     context["output_buffer"]->set( buffer );
 
-    Buffer positionbuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT3, width, height, use_pbo);
-    context["position_buffer"]->set(positionbuffer);
+	Buffer historybuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, width, height, use_pbo);
+	context["history_buffer"]->set(historybuffer);// change to set history
 
-    Buffer normalbuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT3, width, height, use_pbo);
+    Buffer normalbuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, width, height, use_pbo);
     context["normal_buffer"]->set(normalbuffer);
 
-    Buffer historybuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, width, height, use_pbo);
-    context["history_buffer"]->set(historybuffer);
+	Buffer positionbuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, width, height, use_pbo);
+	context["position_buffer"]->set(positionbuffer);
+
+	//
+	glGenBuffers(1, &outputvbo);
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glGenBuffers(1, &EBO);
+
 
     // Setup programs
     const std::string cuda_file = std::string( PROGRAM_NAME ) + ".cu";
@@ -423,6 +545,9 @@ void loadGeometryFromFile(const std::string &filename)
 	transformedToWorld->validate();
 
     context["top_object"]->set(transformedToWorld);
+
+
+	
 }
 
 void loadGeometry()
@@ -623,14 +748,14 @@ void glutDisplay()
     updateCamera();
 
     context->launch( 0, width, height );
+	getOutputBuffer2();
+    //sutil::displayBufferGL( getOutputBuffer() );
 
-    sutil::displayBufferGL( getOutputBuffer() );
-
-    {
-      static unsigned frame_count = 0;
-      sutil::displayFps( frame_count++ );
-    }
-    glutSwapBuffers();
+    //{
+    //  static unsigned frame_count = 0;
+    //  sutil::displayFps( frame_count++ );
+    //}
+    //glutSwapBuffers();
 
 }
 
@@ -835,7 +960,7 @@ int main( int argc, char** argv )
         createContext();
         //setupCamera();
 		//loadGeometry();
-        loadGeometryFromFile("C:/Users/Anseren/Downloads/CornellBox/CornellBox-Original.obj");
+        loadGeometryFromFile("../../CornellBox/CornellBox-Original.obj");
         //loadGeometryFromFile("C:/Users/Anseren/Documents/GitHhub_Projects/Path-Tracing-Reproduction/breakfast_room/breakfast_room.obj");
         //loadGeometryFromFile("C:/ProgramData/NVIDIA Corporation/OptiX SDK 4.1.1/SDK/data/cow.obj");
 

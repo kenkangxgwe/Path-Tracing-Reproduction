@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -62,40 +62,6 @@ __device__ int reset()
 	return 10;
 }
 
-__device__ float4 wavelet_transformtion(float2 index,)
-{
-	float4 sum = make_float4(0.0f);
-	float4 cval = output_buffer[launch_index];
-	float4 nval = normal_buffer[launch_index];
-	float4 pval = position_buffer[launch_index];
-	float c_phi = 1.f;
-	float p_phi = 1.f;
-	float n_phi = 1.f;
-	float cum_w = 0.0;
-	for (int i = -2; i < 3; i++) {
-		for (int j = -2; j < 3;j++){
-			ctmp= output_buffer[float2(launch_index.x + i, launch_index.y + j)]
-			float4 t = cval - ctmp;
-			float dist2 = dot(t, t);
-			flaot c_w = min(exp(-dist2) / c_phi), 1.0);
-
-			float4 t = nval - normal_buffer[float2(launch_index.x + i, launch_index.y+j)];
-			float dist2 = dot(t, t);
-			flaot n_w = min(exp(-dist2) / n_phi), 1.0);
-
-			float4 t = pval - position_buffer[float2(launch_index.x + i, launch_index.y + j)];
-			float dist2 = dot(t, t);
-			flaot n_w = min(exp(-dist2) / p_phi), 1.0);
-
-			float weight = c_w*n_w*p_w;
-			sum += ctmp*weight*kernel[i * 5 + j];
-			cum_w = weight*kernel[i * 5 + j];
-		}
-	}
-	float4 result = sum / cum_w;
-	return result;
-}
-
 // Scene wide variables
 rtDeclareVariable(float,         scene_epsilon, , );
 rtDeclareVariable(rtObject,      top_object, , );
@@ -122,9 +88,9 @@ rtDeclareVariable(unsigned int,  rr_begin_depth, , );
 rtDeclareVariable(unsigned int,  pathtrace_ray_type, , );
 rtDeclareVariable(unsigned int,  pathtrace_shadow_ray_type, , );
 
-rtBuffer<float4, 2>				 history_buffer;
-rtBuffer<float3, 2>				 position_buffer;
-rtBuffer<float3, 2>				 normal_buffer;
+rtBuffer<float4, 2>              history_buffer;
+rtBuffer<float4, 2>              position_buffer;
+rtBuffer<float4, 2>     		 normal_buffer;
 rtBuffer<float4, 2>              output_buffer;
 rtBuffer<ParallelogramLight>     lights;
 
@@ -136,13 +102,13 @@ RT_PROGRAM void pathtrace_camera()
 	//rtPrintf("%d,%d\n", launch_index.x, launch_index.y);
     float2 inv_screen = 1.0f/make_float2(screen) * 2.f;
     float2 pixel = (make_float2(launch_index)) * inv_screen - 1.f;
-	float3 position=make_float3(0.0f);
-	float3 normal = make_float3(0.0f);
+    float3 m_position = make_float3(0.0f);
+    float3 normal = make_float3(0.0f);
     float2 jitter_scale = inv_screen / sqrt_num_samples;
     unsigned int samples_per_pixel = sqrt_num_samples*sqrt_num_samples;
     float3 result = make_float3(0.0f);
     unsigned int seed = tea<16>(screen.x*launch_index.y+launch_index.x, frame_number);
-    do 
+    do
     {
         //
         // Sample pixel using jittering
@@ -176,10 +142,12 @@ RT_PROGRAM void pathtrace_camera()
             {
                 // We have hit the background or a luminaire
                 prd.result += prd.radiance * prd.attenuation;
+				//Victory!
+				//rtPrintf("result = (%f,%f,%f)\n", prd.result.x, prd.result.y, prd.result.z);
                 break;
             }
 
-            // Russian roulette termination 
+            // Russian roulette termination
             if(prd.depth >= rr_begin_depth)
             {
                 float pcont = fmaxf(prd.attenuation);
@@ -190,10 +158,11 @@ RT_PROGRAM void pathtrace_camera()
 
             prd.depth++;
             prd.result += prd.radiance * prd.attenuation;
+			//rtPrintf("result = (%f,%f,%f)\n", prd.result.x, prd.result.y, prd.result.z);
 
             // Update ray data for the next path segment
 			if (prd.depth == 1) {
-				position = prd.origin;
+				m_position = prd.origin;
 				normal = prd.normal;
 			}
             ray_origin = prd.origin;
@@ -211,17 +180,21 @@ RT_PROGRAM void pathtrace_camera()
 
     if (frame_number > 1)
     {
-		
+
         float a = 1.0f / (float)frame_number;
         float3 old_color = make_float3(output_buffer[launch_index]);
-        output_buffer[launch_index] = make_float4( lerp( old_color, pixel_color, a ), 1.0f );
-		normal_buffer[launch_index] = normal;
-		position_buffer[launch_index] = position;
-		// write the filter here
+		output_buffer[launch_index] = make_float4(lerp( old_color, pixel_color, a ), 1.0f );
+		//history_buffer[launch_index] = output_buffer[launch_index];
+        normal_buffer[launch_index] = make_float4(normal,1.0f);
+        position_buffer[launch_index] = make_float4(m_position,1.0f);
+        // write the filter here
     }
     else
     {
         output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
+		history_buffer[launch_index] = output_buffer[launch_index];
+		normal_buffer[launch_index] = make_float4(normal, 1.0f);
+		position_buffer[launch_index] = make_float4(m_position, 1.0f);
     }
 
 }
@@ -250,15 +223,23 @@ RT_PROGRAM void diffuseEmitter()
 //
 //-----------------------------------------------------------------------------
 
-rtDeclareVariable(float3,     diffuse_color, , );
+//rtDeclareVariable(float3,     diffuse_color, , );
+rtDeclareVariable(float3,     Kd, , );
+rtDeclareVariable(float3,     Ke, , );
 rtDeclareVariable(float3,     geometric_normal, attribute geometric_normal, );
 rtDeclareVariable(float3,     shading_normal,   attribute shading_normal, );
-rtDeclareVariable(optix::Ray, ray,              rtCurrentRay, );
+rtDeclareVariable(optix::Ray, ray,              rtCurrentRay, ); 
 rtDeclareVariable(float,      t_hit,            rtIntersectionDistance, );
 
 
 RT_PROGRAM void diffuse()
 {
+	if (Ke.x != 0.f || Ke.y != 0.f || Ke.z != 0.f) {
+		current_prd.radiance = current_prd.countEmitted ? Ke : make_float3(0.f);
+		current_prd.done = true;
+		return;
+	}
+
     float3 world_shading_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
     float3 world_geometric_normal = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, geometric_normal ) );
     float3 ffnormal = faceforward( world_shading_normal, -ray.direction, world_geometric_normal );
@@ -280,7 +261,10 @@ RT_PROGRAM void diffuse()
 	current_prd.normal = world_shading_normal;
     // NOTE: f/pdf = 1 since we are perfectly importance sampling lambertian
     // with cosine density.
-    current_prd.attenuation = current_prd.attenuation * diffuse_color;
+    //current_prd.attenuation = current_prd.attenuation * diffuse_color;
+    current_prd.attenuation = current_prd.attenuation * Kd;
+	//Victory!
+	//rtPrintf("attenuation = (%f, %f, %f)\n", current_prd.attenuation.x, current_prd.attenuation.y, current_prd.attenuation.z);
     current_prd.countEmitted = false;
 
     //
@@ -303,6 +287,7 @@ RT_PROGRAM void diffuse()
         const float  nDl   = dot( ffnormal, L );
         const float  LnDl  = dot( light.normal, L );
 
+		//rtPrintf("L=(%f,%f,%f)", L.x, L.y, L.z);
         // cast shadow ray
         if ( nDl > 0.0f && LnDl > 0.0f )
         {
@@ -317,12 +302,18 @@ RT_PROGRAM void diffuse()
                 const float A = length(cross(light.v1, light.v2));
                 // convert area based pdf to solid angle
                 const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
+				//rtPrintf("weight = %f\n", weight);
+				//rtPrintf("emission = (%f,%f,%f)\n", light.emission.x,light.emission.y,light.emission.z);
                 result += light.emission * weight;
+				//Victory!
+				//rtPrintf("result = (%f,%f,%f)\n", result.x, result.y, result.z);
             }
         }
     }
 
     current_prd.radiance = result;
+	//rtPrintf("current_prd.radiance = (%f,%f,%f)\n", current_prd.radiance.x, current_prd.radiance.y, current_prd.radiance.z);
+
 }
 
 
@@ -366,5 +357,3 @@ RT_PROGRAM void miss()
     current_prd.radiance = bg_color;
     current_prd.done = true;
 }
-
-

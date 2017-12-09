@@ -46,12 +46,12 @@ __device__ void sample_lobe_cone(float z1, float z2, float expn, float3 reflect,
 	const float sp = sinf(phi);
 	const float sa = sinf(alpha);
 	const float ca = cosf(alpha);
-						
+
 	p.x = reflect.x *  (cp*cp * ca + sa*sa) + reflect.y * (ca - 1) * cp * sp + reflect.z * cp * sa;
 	p.y = reflect.x * ((ca - 1) * cp * sp) + reflect.y * (cp*cp + sa * sp*sp) + reflect.z * sa * sp;
 	p.z = reflect.x * -cp * sa + reflect.y * (-1 * sa) * sp + reflect.z* ca;
 
-	// calculate vector p in the scope of our cone. 
+	// calculate vector p in the scope of our cone.
 }
 
 // Scene wide variables
@@ -79,8 +79,8 @@ rtDeclareVariable(unsigned int,  pathtrace_ray_type, , );
 rtDeclareVariable(unsigned int,  pathtrace_shadow_ray_type, , );
 
 rtBuffer<float4, 2>              history_buffer;
-rtBuffer<float3, 2>              position_buffer;
-rtBuffer<float3, 2>     		 normal_buffer;
+rtBuffer<float4, 2>              position_buffer;
+rtBuffer<float4, 2>     		 normal_buffer;
 rtBuffer<float4, 2>              output_buffer;
 rtBuffer<ParallelogramLight>     lights;
 
@@ -167,17 +167,20 @@ RT_PROGRAM void pathtrace_camera()
 
     if (frame_number > 1)
     {
-
-        float a = 1.0f / (float)frame_number;
-        float3 old_color = make_float3(output_buffer[launch_index]);
-        output_buffer[launch_index] = make_float4( lerp( old_color, pixel_color, a ), 1.0f );
-        normal_buffer[launch_index] = normal;
-        position_buffer[launch_index] = position;
-        // write the filter here
+      float a = 1.0f / (float)frame_number;
+      float3 old_color = make_float3(output_buffer[launch_index]);
+      output_buffer[launch_index] = make_float4(lerp( old_color, pixel_color, a ), 1.0f );
+      //history_buffer[launch_index] = output_buffer[launch_index];
+      normal_buffer[launch_index] = make_float4(normal,1.0f);
+      position_buffer[launch_index] = make_float4(position,1.0f);
+      // write the filter here
     }
     else
     {
-        output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
+      output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
+      history_buffer[launch_index] = output_buffer[launch_index];
+      normal_buffer[launch_index] = make_float4(normal, 1.0f);
+      position_buffer[launch_index] = make_float4(position, 1.0f);
     }
 
 }
@@ -212,7 +215,7 @@ rtDeclareVariable(float3,     Ks, , );
 rtDeclareVariable(float,      phong_exp, , );
 rtDeclareVariable(float3,     geometric_normal, attribute geometric_normal, );
 rtDeclareVariable(float3,     shading_normal,   attribute shading_normal, );
-rtDeclareVariable(optix::Ray, ray,              rtCurrentRay, ); 
+rtDeclareVariable(optix::Ray, ray,              rtCurrentRay, );
 rtDeclareVariable(float,      t_hit,            rtIntersectionDistance, );
 
 

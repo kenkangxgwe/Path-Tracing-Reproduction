@@ -497,11 +497,11 @@ void loadGeometryFromFile(const std::string &filename)
     //light.emission = make_float3( 17.0f, 12.0f, 4.0f );
 
     ParallelogramLight light;
-    light.corner   = make_float3( -0.24f, 5.88f, 0.52f);
+    light.corner   = make_float3( -0.24f, 1.88f, 0.52f);
     light.v1       = make_float3( 0.0f, 0.0f, 0.38f);
     light.v2       = make_float3( 0.47f, 0.0f, 0.0f);
     light.normal   = normalize( cross(light.v1, light.v2) );
-    light.emission = make_float3( 457.0f, 452.0f, 420.0f );
+    light.emission = make_float3( 57.0f, 57.0f, 44.0f );
 
     ParallelogramLight light2;
     light2.corner   = make_float3( 0.0f, 0.0f, 3.52f);
@@ -528,7 +528,8 @@ void loadGeometryFromFile(const std::string &filename)
     light_buffer->setFormat( RT_FORMAT_USER );
     light_buffer->setElementSize( sizeof( ParallelogramLight ) );
     light_buffer->setSize( 4u );
-    memcpy( light_buffer->map(), &lightArray, sizeof( lightArray) );
+    //memcpy( light_buffer->map(), &lightArray, sizeof( lightArray) );
+    memcpy( light_buffer->map(), &light, sizeof( light) );
     light_buffer->unmap();
     context["lights"]->setBuffer( light_buffer );
 
@@ -776,7 +777,7 @@ void printUsageAndExit( const std::string& argv0 )
 int main( int argc, char** argv )
  {
     std::string out_file;
-    std::string mesh_file = std::string( sutil::samplesDir() ) + "/data/cow.obj";
+    std::string mesh_file = std::string( sutil::samplesDir() ) + "/data/CornellBox-Original.obj";
     for( int i=1; i<argc; ++i )
     {
         const std::string arg( argv[i] );
@@ -823,12 +824,10 @@ int main( int argc, char** argv )
 #endif
 
         createContext();
-        //setupCamera();
-		//loadGeometry();
-        loadGeometryFromFile("../../CornellBox/CornellBox-Original.obj");
-        //loadGeometryFromFile("C:/Users/Anseren/Documents/GitHhub_Projects/Path-Tracing-Reproduction/breakfast_room/breakfast_room.obj");
-        //loadGeometryFromFile("C:/ProgramData/NVIDIA Corporation/OptiX SDK 4.1.1/SDK/data/cow.obj");
-		loadGeometryFromFile("C:/Users/Anseren/Downloads/sportsCar/sportsCar.obj");
+        //loadGeometryFromFile();
+        //loadGeometryFromFile("../../data/cow.obj");
+		//loadGeometryFromFile("../../data/sportsCar.obj");
+		loadGeometryFromFile(mesh_file);
         context->validate();
 
         if ( out_file.empty() )
